@@ -159,6 +159,20 @@ pip install -r requirements-dev.txt
 pytest tests/
 ```
 
+The harness answers "is it faster and by how much," deliberately not
+"why" — guessing why from a timing number alone is how optimization effort
+gets spent in the wrong place. `profile.py` captures a py-spy flamegraph of
+a scenario's baseline (or optimized) path so that question gets answered by
+looking, not assuming:
+
+```
+sudo python3 profile.py example_moving_average --which baseline --out baseline.svg
+```
+
+`py-spy` needs root on macOS to attach to a process, even one it launches
+itself. See `examples/baseline_flamegraph.svg` for a captured one and what
+it showed.
+
 ## Design intent
 
 The three-step discipline here — verify correctness, measure past noise,
