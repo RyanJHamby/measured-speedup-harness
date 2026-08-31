@@ -1,0 +1,5 @@
+numpy
+hypothesis
+pytest
+matplotlib
+py-spy

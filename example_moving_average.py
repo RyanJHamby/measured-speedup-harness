@@ -17,25 +17,19 @@ import numpy as np
 
 from harness import compare, render_finding
 
-N = 200_000
-WINDOW = 50
 
-random.seed(0)
-DATA = np.array([random.random() for _ in range(N)])
-
-
-def baseline() -> np.ndarray:
-    """Naive O(N*WINDOW) sliding-sum implementation."""
-    out = np.empty(N - WINDOW + 1)
+def moving_average_naive(data: np.ndarray, window: int) -> np.ndarray:
+    """Naive O(N*window) sliding-sum implementation."""
+    out = np.empty(len(data) - window + 1)
     for i in range(len(out)):
-        out[i] = sum(DATA[i : i + WINDOW]) / WINDOW
+        out[i] = sum(data[i : i + window]) / window
     return out
 
 
-def optimized() -> np.ndarray:
+def moving_average_vectorized(data: np.ndarray, window: int) -> np.ndarray:
     """O(N) cumulative-sum implementation of the same sliding average."""
-    cumsum = np.cumsum(np.insert(DATA, 0, 0.0))
-    return (cumsum[WINDOW:] - cumsum[:-WINDOW]) / WINDOW
+    cumsum = np.cumsum(np.insert(data, 0, 0.0))
+    return (cumsum[window:] - cumsum[:-window]) / window
 
 
 def check_equivalent(a: np.ndarray, b: np.ndarray) -> tuple[bool, str]:
@@ -45,16 +39,14 @@ def check_equivalent(a: np.ndarray, b: np.ndarray) -> tuple[bool, str]:
 
 
 if __name__ == "__main__":
-    # N is intentionally small here so the naive baseline finishes in a
-    # reasonable time under 30 trials; shrink further if this is slow on
-    # your machine.
-    small_n = 4_000
-    DATA = DATA[:small_n]
-    N = small_n
+    random.seed(0)
+    N = 4_000
+    WINDOW = 50
+    data = np.array([random.random() for _ in range(N)])
 
     result = compare(
-        baseline_fn=baseline,
-        optimized_fn=optimized,
+        baseline_fn=lambda: moving_average_naive(data, WINDOW),
+        optimized_fn=lambda: moving_average_vectorized(data, WINDOW),
         check_equivalent=check_equivalent,
         n_trials=25,
         warmup=3,
