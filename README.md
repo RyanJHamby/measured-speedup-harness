@@ -113,14 +113,37 @@ result = compare(
 print(render_finding(result, technique="...", target="...", source="..."))
 ```
 
-`example_moving_average.py` is a fully worked example — a naive O(N·W)
-sliding-sum loop compared against an O(N) cumsum-based implementation. The
-target is intentionally simple so the harness itself is what's being
-demonstrated. Swap in any baseline/candidate pair; `harness.py` doesn't
-change.
+`example_moving_average.py` (memory-bound) and `example_matmul.py`
+(compute-bound) are fully worked examples. Both run standalone:
 
 ```
 python3 example_moving_average.py
+python3 example_matmul.py
+```
+
+Or run either through the CLI, which works against any module exposing
+`BASELINE_FN`, `OPTIMIZED_FN`, `CHECK_EQUIVALENT`, `TECHNIQUE`, `TARGET`,
+and `SOURCE`:
+
+```
+python3 bench.py example_moving_average --n-trials 50 --min-speedup 3
+python3 bench.py example_matmul
+```
+
+Both examples double as the reference for wiring up a new comparison —
+write a module with the six attributes above and `bench.py` runs it the
+same way, without touching `harness.py`.
+
+The one-off correctness check inside `compare()` only checks the specific
+input each example happens to use. `tests/` runs the two implementations
+against hundreds of generated inputs (via Hypothesis) to catch the boundary
+cases a hand-picked example would miss — this is how the precision limit
+documented in `moving_average_vectorized` was actually found, not
+guessed at in advance:
+
+```
+pip install -r requirements-dev.txt
+pytest tests/
 ```
 
 ## Design intent
