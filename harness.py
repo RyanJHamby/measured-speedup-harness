@@ -99,13 +99,13 @@ def compare(
 
     Decision rule (declared here, applied mechanically, not adjusted after
     seeing results):
-      - If correctness fails: tier = "rejected" regardless of timing.
-      - If correctness passes but speedup < min_speedup_pct: tier = "speculative"
+      - If correctness fails: tier = "fail" regardless of timing.
+      - If correctness passes but speedup < min_speedup_pct: tier = "noise"
         (not enough measured effect to act on).
       - If speedup >= min_speedup_pct but the Welch t-statistic is below
-        t_threshold: tier = "likely" (effect is plausible but not clearly
+        t_threshold: tier = "marginal" (effect is plausible but not clearly
         separated from trial-to-trial noise at this sample size).
-      - If speedup >= min_speedup_pct and t_stat >= t_threshold: tier = "verified".
+      - If speedup >= min_speedup_pct and t_stat >= t_threshold: tier = "confirmed".
     """
     baseline_out = baseline_fn()
     optimized_out = optimized_fn()
@@ -145,13 +145,13 @@ def compare(
     )
 
     if not passed:
-        tier = "rejected"
+        tier = "fail"
     elif speedup_pct < min_speedup_pct:
-        tier = "speculative"
+        tier = "noise"
     elif t_stat < t_threshold:
-        tier = "likely"
+        tier = "marginal"
     else:
-        tier = "verified"
+        tier = "confirmed"
 
     return ComparisonResult(
         baseline=baseline_stats,
@@ -165,11 +165,11 @@ def compare(
     )
 
 
-def render_lesson(result: ComparisonResult, technique: str, target: str, source: str) -> str:
-    """Render a ComparisonResult as a lesson record: a technique claim tagged
+def render_finding(result: ComparisonResult, technique: str, target: str, source: str) -> str:
+    """Render a ComparisonResult as a finding: a technique claim tagged
     with a confidence tier and the measurement that backs it, rather than a
     bare assertion that something is "faster." Meant to be appended to a
-    running lessons log so later work can cite what was actually verified
+    running findings log so later work can cite what was actually confirmed
     instead of re-litigating it."""
     b, o = result.baseline, result.optimized
     lines = [

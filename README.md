@@ -28,24 +28,24 @@ allowed to be called real:
    throttling, memory pressure, background load) then affects both arms
    roughly equally instead of biasing whichever ran second.
 3. **A decision rule fixed before looking at the numbers.** A result only
-   counts as "verified" if it clears both a minimum effect-size threshold
+   counts as "confirmed" if it clears both a minimum effect-size threshold
    (default 5%) *and* a statistical margin (Welch's t-statistic vs. a
    threshold) — not just "the mean was lower."
 
 ## What it produces
 
-Every comparison renders as a **lesson record**: a one-line technique
+Every comparison renders as a **finding**: a one-line technique
 claim tagged with a confidence tier and the measurement that backs it,
 rather than a bare assertion that something is faster.
 
 ```
 ## Replace naive O(N*W) sliding-sum loop with O(N) cumsum-based moving average
 - target: moving average, N=4000, window=50
-- confidence: verified
+- confidence: confirmed
 - correctness: pass (max abs diff = 2.89e-14, rtol=1e-9)
-- baseline: 14.7934 ms +/- 0.3068 ms (n=25)
-- optimized: 0.0337 ms +/- 0.0034 ms (n=25)
-- speedup: 99.8% (t=240.51)
+- baseline: 16.4050 ms +/- 1.3765 ms (n=25)
+- optimized: 0.1092 ms +/- 0.0254 ms (n=25)
+- speedup: 99.3% (t=59.18)
 - decision_rule: correctness gate; min_speedup_pct=5.0; t_threshold=2.0 (Welch's t, 25 interleaved trials)
 - source: example_moving_average.py, run locally, no external deps beyond numpy
 ```
@@ -54,20 +54,20 @@ Confidence tiers:
 
 | Tier | Meaning |
 |---|---|
-| `rejected` | Correctness check failed. Timing is irrelevant. |
-| `speculative` | Correct, but effect size is below the minimum threshold — noise-level. |
-| `likely` | Effect size clears the threshold, but isn't statistically separated from trial noise at this sample size — worth a second look with more trials, not yet worth acting on. |
-| `verified` | Clears both the effect-size threshold and the statistical margin. |
+| `fail` | Correctness check failed. Timing is irrelevant. |
+| `noise` | Correct, but effect size is below the minimum threshold — noise-level. |
+| `marginal` | Effect size clears the threshold, but isn't statistically separated from trial noise at this sample size — worth a second look with more trials, not yet worth acting on. |
+| `confirmed` | Clears both the effect-size threshold and the statistical margin. |
 
-The tiering exists so a growing `lessons.md` log stays honest: a claim
+The tiering exists so a growing `findings.md` log stays honest: a claim
 that later turns out to be noise is visibly downgraded rather than quietly
 forgotten, and a claim that hasn't been re-checked in a while can be told
-apart from one that was actually verified.
+apart from one that was actually confirmed.
 
 ## Usage
 
 ```python
-from harness import compare, render_lesson
+from harness import compare, render_finding
 
 result = compare(
     baseline_fn=my_baseline,       # () -> output
@@ -78,7 +78,7 @@ result = compare(
     min_speedup_pct=5.0,
     t_threshold=2.0,
 )
-print(render_lesson(result, technique="...", target="...", source="..."))
+print(render_finding(result, technique="...", target="...", source="..."))
 ```
 
 `example_moving_average.py` is a fully worked, dependency-light example

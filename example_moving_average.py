@@ -15,7 +15,7 @@ import random
 
 import numpy as np
 
-from harness import compare, render_lesson
+from harness import compare, render_finding
 
 N = 200_000
 WINDOW = 50
@@ -63,13 +63,13 @@ if __name__ == "__main__":
         label="moving average: naive loop vs cumsum",
     )
 
-    lesson = render_lesson(
+    finding = render_finding(
         result,
         technique="Replace naive O(N*W) sliding-sum loop with O(N) cumsum-based moving average",
         target=f"moving average, N={N}, window={WINDOW}",
         source="example_moving_average.py, run locally, no external deps beyond numpy",
     )
 
-    print(lesson)
-    with open("lessons.md", "a") as f:
-        f.write(lesson + "\n\n")
+    print(finding)
+    with open("findings.md", "a") as f:
+        f.write(finding + "\n\n")
