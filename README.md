@@ -41,13 +41,20 @@ percentage with no basis behind it.
 ## Replace naive O(N*W) sliding-sum loop with O(N) cumsum-based moving average
 - target: moving average, N=4000, window=50
 - confidence: confirmed
-- correctness: pass (max abs diff = 2.89e-14, rtol=1e-9)
-- baseline: 16.4050 ms +/- 1.3765 ms (n=25)
-- optimized: 0.1092 ms +/- 0.0254 ms (n=25)
-- speedup: 99.3% (t=59.18)
+- correctness: pass (max abs diff = 2.89e-14, rtol=1e-6)
+- baseline: 14.7356 ms +/- 0.3006 ms (n=25)
+- optimized: 0.0393 ms +/- 0.0138 ms (n=25)
+- speedup: 99.7% (t=244.17), 95% CI [99.7%, 99.8%]
 - decision_rule: correctness gate; min_speedup_pct=5.0; t_threshold=2.0 (Welch's t, 25 interleaved trials)
 - source: example_moving_average.py, run locally, no external deps beyond numpy
 ```
+
+The 95% CI comes from bootstrap resampling of the trial data, alongside
+the Welch's t-test. The t-test assumes roughly normal timing distributions;
+real timing data is often right-skewed (most calls cluster near a floor,
+with occasional slow outliers from GC or OS scheduling), so the bootstrap
+interval is reported as a second, distribution-free view of the same
+question rather than a replacement for the t-test.
 
 | Tier | Meaning |
 |---|---|

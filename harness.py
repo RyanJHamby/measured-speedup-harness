@@ -26,6 +26,7 @@ an optimized callable, and a function that checks their outputs match.
 from __future__ import annotations
 
 import math
+import random
 import statistics
 import time
 from dataclasses import dataclass, field
@@ -57,6 +58,9 @@ class ComparisonResult:
     correctness_detail: str
     speedup_pct: float
     t_stat: float
+    speedup_ci_low: float
+    speedup_ci_high: float
+    ci_confidence: float
     tier: str
     rule_applied: str
 
@@ -82,6 +86,40 @@ def _welch_t(a: TrialStats, b: TrialStats) -> float:
     return (a.mean - b.mean) / denom
 
 
+def _bootstrap_speedup_ci(
+    baseline: TrialStats,
+    optimized: TrialStats,
+    n_resamples: int = 2000,
+    confidence: float = 0.95,
+    rng: random.Random | None = None,
+) -> tuple[float, float]:
+    """
+    Bootstrap confidence interval for the speedup percentage.
+
+    Welch's t-test assumes the underlying timing distributions are roughly
+    normal, which trial timings often aren't (they're frequently right-skewed
+    - most calls cluster near a floor, with occasional slow outliers from
+    scheduling or GC). Bootstrapping resamples the observed trials with
+    replacement and recomputes the speedup many times, giving a confidence
+    interval that doesn't depend on that assumption. It's a second, largely
+    independent check on the same question the t-test answers.
+    """
+    rng = rng or random.Random()
+    b_samples, o_samples = baseline.samples, optimized.samples
+    speedups = []
+    for _ in range(n_resamples):
+        b_resample = rng.choices(b_samples, k=len(b_samples))
+        o_resample = rng.choices(o_samples, k=len(o_samples))
+        b_mean = sum(b_resample) / len(b_resample)
+        o_mean = sum(o_resample) / len(o_resample)
+        speedups.append((b_mean - o_mean) / b_mean * 100.0 if b_mean else 0.0)
+
+    speedups.sort()
+    lo_idx = int((1 - confidence) / 2 * n_resamples)
+    hi_idx = min(int((1 + confidence) / 2 * n_resamples), n_resamples - 1)
+    return speedups[lo_idx], speedups[hi_idx]
+
+
 def compare(
     baseline_fn: Callable[[], object],
     optimized_fn: Callable[[], object],
@@ -91,6 +129,9 @@ def compare(
     min_speedup_pct: float = 5.0,
     t_threshold: float = 2.0,
     label: str = "unnamed comparison",
+    n_bootstrap_resamples: int = 2000,
+    ci_confidence: float = 0.95,
+    bootstrap_seed: int | None = None,
 ) -> ComparisonResult:
     """
     Run an interleaved A/B timing comparison with a correctness gate.
@@ -138,6 +179,13 @@ def compare(
         else 0.0
     )
     t_stat = _welch_t(baseline_stats, optimized_stats)
+    ci_low, ci_high = _bootstrap_speedup_ci(
+        baseline_stats,
+        optimized_stats,
+        n_resamples=n_bootstrap_resamples,
+        confidence=ci_confidence,
+        rng=random.Random(bootstrap_seed) if bootstrap_seed is not None else None,
+    )
 
     rule_applied = (
         f"correctness gate; min_speedup_pct={min_speedup_pct}; "
@@ -160,6 +208,9 @@ def compare(
         correctness_detail=detail,
         speedup_pct=speedup_pct,
         t_stat=t_stat,
+        speedup_ci_low=ci_low,
+        speedup_ci_high=ci_high,
+        ci_confidence=ci_confidence,
         tier=tier,
         rule_applied=rule_applied,
     )
@@ -180,7 +231,9 @@ def render_finding(result: ComparisonResult, technique: str, target: str, source
         f"({result.correctness_detail})",
         f"- baseline: {b.mean * 1e3:.4f} ms +/- {b.stdev * 1e3:.4f} ms (n={b.n})",
         f"- optimized: {o.mean * 1e3:.4f} ms +/- {o.stdev * 1e3:.4f} ms (n={o.n})",
-        f"- speedup: {result.speedup_pct:.1f}% (t={result.t_stat:.2f})",
+        f"- speedup: {result.speedup_pct:.1f}% (t={result.t_stat:.2f}), "
+        f"{result.ci_confidence * 100:.0f}% CI [{result.speedup_ci_low:.1f}%, "
+        f"{result.speedup_ci_high:.1f}%]",
         f"- decision_rule: {result.rule_applied}",
         f"- source: {source}",
     ]
