@@ -1,42 +1,51 @@
 # measured-speedup-harness
 
-A small harness for making "this is faster" claims that survive scrutiny.
+I got tired of "I benchmarked it, it's faster" claims that fall apart the
+second someone reruns the benchmark. This is the harness I actually use to
+decide whether a change is worth keeping.
 
-## The problem
+**The short version, if you don't write code:** a stopwatch lies if you only
+click it once. Your laptop is doing a hundred other things while your code
+runs, so two runs of the *exact same, unchanged* program can differ by
+20-30% just from noise. If you only time something once before and once
+after a change, you can't tell "it's faster" apart from "I got lucky." This
+tool runs both versions back-to-back a bunch of times, checks that they
+still give the same answer, and only calls something a real win if the
+difference is bigger than the noise floor. That's it.
 
-A single before/after timing is not evidence. Trial-to-trial noise from
-cache state, GC pauses, scheduler jitter, and thermal throttling routinely
-swings 10-30% between two runs of the *same* code. Two failure modes follow
-from trusting a single run:
+**The longer version, if you do:**
 
-- **False positive:** a lucky run makes an unchanged (or even slower)
-  version look like a win.
-- **Silent correctness regression:** a change that's genuinely faster
-  because it does less work — skips an edge case, truncates precision,
-  changes behavior at a boundary — ships as a "speedup" because nobody
-  checked the output matched.
+Every "we made this faster" claim I've seen go wrong has failed for one of
+two boring reasons — nobody checked the output still matched, or nobody
+looked at run-to-run variance before declaring victory. Both are cheap to
+catch and annoying to debug after the fact, usually as either a silent
+correctness regression that ships because the fast path skips an edge case,
+or a benchmark result that quietly evaporates the next time someone reruns
+it in CI.
 
-This harness forces three things to happen, in order, before a speedup is
-allowed to be called real:
+So this harness enforces an order of operations:
 
-1. **Correctness first.** Baseline and candidate outputs are compared
-   before any timing is trusted. A fast wrong answer is rejected outright,
-   regardless of how good the numbers look.
-2. **Interleaved trials, not sequential blocks.** The harness alternates
-   baseline/optimized calls (A/B/A/B/...) rather than timing all of one
-   arm and then all of the other. Slow drift over the run (thermal
-   throttling, memory pressure, background load) then affects both arms
-   roughly equally instead of biasing whichever ran second.
-3. **A decision rule fixed before looking at the numbers.** A result only
-   counts as "confirmed" if it clears both a minimum effect-size threshold
-   (default 5%) *and* a statistical margin (Welch's t-statistic vs. a
-   threshold) — not just "the mean was lower."
+1. **Correctness before speed, always.** Baseline and candidate outputs get
+   compared before any timing number is trusted. A fast wrong answer gets
+   rejected outright — timing a broken implementation is not interesting.
+2. **Interleaved trials, not two separate blocks.** It alternates
+   baseline/candidate calls (A, B, A, B, ...) instead of timing all of one
+   then all of the other. If the machine gets slower over the course of the
+   run — thermal throttling, memory pressure, whatever — that drift hits
+   both arms about equally instead of unfairly penalizing whichever one ran
+   second.
+3. **A decision rule you commit to before looking at the numbers.** A
+   result only gets called `confirmed` if it clears both a minimum effect
+   size (5% by default — under that, who cares) *and* a statistical margin
+   (a Welch's t-test against the noise in both samples). Otherwise you're
+   just eyeballing a mean and hoping.
 
-## What it produces
+## What comes out the other end
 
-Every comparison renders as a **finding**: a one-line technique
-claim tagged with a confidence tier and the measurement that backs it,
-rather than a bare assertion that something is faster.
+Each comparison produces a **finding** — a plain-text record of what was
+tried, whether it was actually correct, what the numbers were, and how
+confident you should be, instead of a bare "20% faster!" claim with nothing
+behind it:
 
 ```
 ## Replace naive O(N*W) sliding-sum loop with O(N) cumsum-based moving average
@@ -50,21 +59,21 @@ rather than a bare assertion that something is faster.
 - source: example_moving_average.py, run locally, no external deps beyond numpy
 ```
 
-Confidence tiers:
+Four tiers, in order of how much I'd trust them:
 
-| Tier | Meaning |
+| Tier | What it means |
 |---|---|
-| `fail` | Correctness check failed. Timing is irrelevant. |
-| `noise` | Correct, but effect size is below the minimum threshold — noise-level. |
-| `marginal` | Effect size clears the threshold, but isn't statistically separated from trial noise at this sample size — worth a second look with more trials, not yet worth acting on. |
-| `confirmed` | Clears both the effect-size threshold and the statistical margin. |
+| `fail` | Outputs didn't match. Don't even look at the timing. |
+| `noise` | Outputs matched, but the speedup is smaller than the threshold — could easily be nothing. |
+| `marginal` | Speedup clears the threshold but isn't statistically distinct from the noise in the samples yet. Worth more trials before you tell anyone. |
+| `confirmed` | Clears both bars. This is one I'd actually put in a PR description. |
 
-The tiering exists so a growing `findings.md` log stays honest: a claim
-that later turns out to be noise is visibly downgraded rather than quietly
-forgotten, and a claim that hasn't been re-checked in a while can be told
-apart from one that was actually confirmed.
+The point of keeping these in a running `findings.md` is honesty over time
+— if something marked `confirmed` six months ago turns out to be `noise`
+on a different machine or after some other change, that's visible instead
+of buried. A stale claim and a re-verified one shouldn't look the same.
 
-## Usage
+## Using it
 
 ```python
 from harness import compare, render_finding
@@ -81,23 +90,23 @@ result = compare(
 print(render_finding(result, technique="...", target="...", source="..."))
 ```
 
-`example_moving_average.py` is a fully worked, dependency-light example
-(naive O(N·W) sliding-sum loop vs. an O(N) cumsum-based implementation) —
-deliberately generic so the harness itself, not the target op, is what's
-on display. Swap in whatever real comparison you're running; the harness
-doesn't change.
+`example_moving_average.py` is the worked example — naive O(N·W) sliding
+sum vs. an O(N) cumsum-based version. I picked something boring on purpose;
+the point is the harness, not the optimization. Swap in whatever you're
+actually comparing and nothing about `harness.py` needs to change.
 
 ```
 python3 example_moving_average.py
 ```
 
-## Why this shape
+## Why bother with all this for a toy example
 
-Most "we made X faster" claims in practice fail for one of two reasons:
-nobody checked correctness, or nobody looked at variance before declaring
-victory. Both are cheap to prevent and expensive to discover after the
-fact (a regression that ships because a benchmark was gamed, or a
-"speedup" that evaporates the next time someone reruns it). This harness
-is intentionally small — the point isn't the implementation, it's making
-the judgment call ("is this real, and how sure am I") explicit and
-repeatable instead of ad hoc.
+Because the discipline is the thing that transfers, not the moving
+average. The same three steps — verify correctness first, measure enough
+times to see past noise, and decide in advance what counts as a real
+win — apply whether you're comparing two Python functions on a laptop or
+two kernels on a cluster. Most of the benchmarking mistakes I've seen
+weren't about the code being optimized; they were about skipping one of
+these three steps under time pressure. This repo is small on purpose —
+it's meant to be a habit you can point to, not a framework you have to
+adopt.
