@@ -135,7 +135,13 @@ and `SOURCE`:
 ```
 python3 bench.py example_moving_average --n-trials 50 --min-speedup 3
 python3 bench.py example_matmul
+python3 bench.py example_moving_average --plot moving_average.png
 ```
+
+`--plot` saves a histogram of the baseline/optimized trial distributions.
+The numbers in a finding are the rigorous version of the argument; the
+plot is the fast version — useful when the audience wants to see that the
+two distributions don't overlap rather than parse a decision rule.
 
 Both examples double as the reference for wiring up a new comparison —
 write a module with the six attributes above and `bench.py` runs it the

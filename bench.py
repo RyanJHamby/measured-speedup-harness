@@ -74,6 +74,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-speedup", type=float, default=5.0, dest="min_speedup")
     parser.add_argument("--t-threshold", type=float, default=2.0, dest="t_threshold")
     parser.add_argument("--findings-file", default="findings.md")
+    parser.add_argument(
+        "--plot",
+        metavar="PNG_PATH",
+        default=None,
+        help="Save a histogram of the baseline/optimized trial distributions to this path",
+    )
     args = parser.parse_args(argv)
 
     module = importlib.import_module(args.scenario)
@@ -88,6 +94,12 @@ def main(argv: list[str] | None = None) -> int:
     print(finding)
     with open(args.findings_file, "a") as f:
         f.write(finding + "\n\n")
+
+    if args.plot:
+        from plot import plot_trial_distributions
+
+        plot_trial_distributions(result, title=module.TECHNIQUE, out_path=args.plot)
+        print(f"wrote {args.plot}")
 
     return 0 if result.tier != "fail" else 1
 
