@@ -170,8 +170,23 @@ sudo python3 profile.py example_moving_average --which baseline --out baseline.s
 ```
 
 `py-spy` needs root on macOS to attach to a process, even one it launches
-itself. See `examples/baseline_flamegraph.svg` for a captured one and what
-it showed.
+itself.
+
+**What one of these actually shows:**
+
+![Flamegraph of the naive moving-average baseline](examples/baseline_flamegraph.png)
+
+208 samples, ~100% inside `moving_average_naive`, and inside that frame the
+time splits almost entirely into the `sum()` call on each window slice (207
+of 208 samples) rather than the loop header around it. That's the actual
+evidence for why the cumsum rewrite helps — not an assumption that "loops
+are slow," but a profiler confirming exactly which line the cost sits on
+before touching any code.
+
+[View the interactive version](https://ryanjhamby.github.io/measured-speedup-harness/examples/baseline_flamegraph.svg)
+(click to zoom into a frame, `/` to search) — GitHub strips the `<script>`
+a flamegraph SVG needs for that out of anything rendered inline, so the
+image above is the static view and this link is the real one.
 
 ## Design intent
 
