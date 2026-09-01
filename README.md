@@ -133,6 +133,11 @@ Some concrete cases it's suited for:
   usually large and easy to confirm, but the correctness gate still
   matters: vectorized rewrites are a common place to introduce off-by-one
   or edge-case bugs at array boundaries.
+- **Numerical-stability tradeoffs** — a "faster" formula (single-pass
+  variance, unstabilized softmax, plain cumsum) can be faster only within
+  a domain, and finding that domain's actual edge takes property-testing,
+  not assumption. See "Case studies" below for three worked examples,
+  including one that reversed its own starting assumption once measured.
 - **Regression protection over time** — the same comparison can be re-run
   on every change to a hot path, so a `confirmed` speedup that later
   degrades to `noise` (a dependency update, a platform change, an
@@ -202,6 +207,83 @@ it (uploaded as a build artifact each run) keeps it useful without being
 a source of flaky failures. Correctness gets the hard gate because it
 doesn't have this problem — two implementations either agree or they
 don't, regardless of which machine ran them.
+
+## Case studies: when "faster" and "correct" trade off
+
+The moving-average and matmul examples above are both cases where the
+faster version is simply better — no downside, ship it. That's the easy
+case. The more interesting one, and the one this harness is actually built
+for, is when a "faster" implementation is only faster *within a domain*,
+and finding that domain's edge requires actually looking rather than
+assuming. Three more scenarios in this repo are built around exactly that:
+
+- **`example_variance.py`** — the classic single-pass "sum of squares minus
+  square of sum" variance formula is a textbook catastrophic-cancellation
+  trap. Property-testing it (`tests/test_variance_equivalence.py`, swept
+  across 1680+ magnitude/spread/n/seed combinations, not one hand-picked
+  case) found it's negligible at realistic magnitudes (mean ~100, ~1e-14
+  relative error) and reliably breaks down — including returning outright
+  *negative* variance, mathematically impossible — once the mean's
+  magnitude reaches roughly 1e10–1e12. The build's first assumption was
+  that Welford's algorithm (the numerically stable alternative) would also
+  be the faster one. Measuring it said otherwise: in pure Python, both
+  stable alternatives are 2-3x *slower*, correctly tiered `noise` by the
+  harness instead of a forced "confirmed" speedup — the honest framing
+  here is "what does fixing the bug cost," not "this is also faster."
+- **`example_softmax.py`** — naive softmax (`exp(x)` then normalize) has
+  two distinct failure modes, not one, found by actually running it rather
+  than trusting the textbook description
+  (`tests/test_softmax_equivalence.py`): the well-known overflow-to-`nan`
+  around x ≈ 709.78, and a subtler "silent zero" regime starting around
+  x ≈ log(float64_max / n) where `sum(exp(x))` overflows *before* any
+  individual term does — every output is silently `0.0`, no `nan`, no
+  `inf`, nothing that looks broken unless the sum-to-1 invariant is
+  explicitly checked. `CHECK_EQUIVALENT` validates finiteness,
+  non-negativity, *and* sum≈1 specifically because a `nan`/`inf` check
+  alone would have missed that second regime entirely. The fix costs
+  ~15-17% in speed, measured, not assumed — another `noise`-tier result.
+- **`example_moving_average_variants.py`'s `kahan` candidate** — closes a
+  promissory note this repo's own docstring left open (`use compensated
+  Kahan summation ... instead of one running cumsum`). Built and measured:
+  Kahan summation does extend cumsum's precision domain roughly three
+  orders of magnitude further (~1e3 → ~1e7, per
+  `tests/test_kahan_moving_average.py`), but the compensation step is
+  inherently sequential and can't be vectorized — this implementation runs
+  ~40x *slower* than cumsum, not comparably fast as the original docstring
+  assumed. `moving_average_convolve` (already in this repo) turns out to
+  dominate it outright: faster than Kahan *and* exact on the same
+  adversarial input, since it never forms a large running total either.
+  Kahan's real value is for problems without a convolution-shaped
+  alternative — not this one.
+
+Run all four single-baseline scenarios as one batch, the same way you'd
+validate a real migration:
+
+```
+python3 run_suite.py example_moving_average example_matmul example_variance example_softmax \
+  --ledger-file findings.jsonl
+```
+
+```
+Suite summary: 2 confirmed, 2 noise
+4/4 significant after Benjamini-Hochberg FDR correction (alpha=0.05) across 4 comparisons
+
+| scenario | tier | speedup | correctness | sig. after FDR correction |
+|---|---|---|---|---|
+| example_moving_average | confirmed | 99.7% | pass | yes |
+| example_matmul | confirmed | 100.0% | pass | yes |
+| example_variance | noise | -215.7% | pass | yes |
+| example_softmax | noise | -17.3% | pass | yes |
+```
+
+Worth noticing: `variance` and `softmax` are `noise`-tier (they got
+*slower*, below the minimum effect threshold) but still show `yes` for FDR
+significance. That's correct, not contradictory — "significant" answers
+"is this effect real, not chance," while the tier answers "is this the
+kind of effect (a speedup past the minimum) we're looking for." A
+consistent, statistically real slowdown is exactly what "noise tier,
+significant" should show: the numbers aren't noisy, the *result* just
+isn't the win a fast-but-wrong intuition would have assumed.
 
 ## Using it
 

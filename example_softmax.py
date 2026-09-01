@@ -74,14 +74,19 @@ def _check_equivalent(a: np.ndarray, b: np.ndarray) -> tuple[bool, str]:
     return ok, f"max abs diff = {max_diff:.2e}, rtol=1e-9"
 
 
-# Scenario definition consumed by leaderboard.py. Realistic, non-adversarial
-# magnitude: the point of tests/test_softmax_equivalence.py is to find the
-# edge case via Hypothesis, not to make the default demo itself adversarial.
+# Scenario definition. Realistic, non-adversarial magnitude: the point of
+# tests/test_softmax_equivalence.py is to find the edge case via Hypothesis,
+# not to make the default demo itself adversarial.
 _X = np.random.default_rng(0).normal(loc=0.0, scale=3.0, size=2_000)
 
 BASELINE_FN = lambda: softmax_naive(_X)
-CANDIDATES = {"stable": lambda: softmax_stable(_X)}
+OPTIMIZED_FN = lambda: softmax_stable(_X)  # bench.py/run_suite.py contract
+CANDIDATES = {"stable": lambda: softmax_stable(_X)}  # leaderboard.py contract
 CHECK_EQUIVALENT = _check_equivalent
+# Framed as a safety fix, not a speedup: measured ~15-17% slower, not faster
+# (see the module docstring) - bench.py's tiering correctly reports that as
+# "noise" in the wrong direction, not a false "confirmed" speedup.
+TECHNIQUE = "Naive softmax vs. max-subtraction-stabilized softmax: what avoiding overflow/silent-zero costs"
 TARGET = f"softmax, N={len(_X)}, values ~ N(0, 3)"
 SOURCE = "example_softmax.py, run locally, no external deps beyond numpy"
 
