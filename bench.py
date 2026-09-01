@@ -17,10 +17,11 @@ Usage:
 
 import argparse
 import importlib
+import json
 import sys
 from types import ModuleType
 
-from harness import ComparisonResult, compare, render_finding
+from harness import ComparisonResult, compare, render_finding, to_ledger_record
 
 REQUIRED_ATTRS = [
     "BASELINE_FN",
@@ -75,6 +76,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--t-threshold", type=float, default=2.0, dest="t_threshold")
     parser.add_argument("--findings-file", default="findings.md")
     parser.add_argument(
+        "--ledger-file",
+        default=None,
+        help="Append a machine-readable JSONL record here for regression_check.py "
+        "(default: don't write one)",
+    )
+    parser.add_argument(
         "--plot",
         metavar="PNG_PATH",
         default=None,
@@ -94,6 +101,13 @@ def main(argv: list[str] | None = None) -> int:
     print(finding)
     with open(args.findings_file, "a") as f:
         f.write(finding + "\n\n")
+
+    if args.ledger_file:
+        record = to_ledger_record(
+            result, technique=module.TECHNIQUE, target=module.TARGET, source=module.SOURCE
+        )
+        with open(args.ledger_file, "a") as f:
+            f.write(json.dumps(record) + "\n")
 
     if args.plot:
         from plot import plot_trial_distributions

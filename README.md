@@ -197,6 +197,26 @@ one element, not computation. A further optimization, if it mattered at
 this scale, would preallocate the output array and write the running sum
 into it directly instead of calling `np.insert`.
 
+## Tracking results over time
+
+A `confirmed` speedup isn't permanent — a dependency upgrade, a different
+machine, or an unrelated nearby change can erode it. `bench.py --ledger-file`
+appends a machine-readable JSON record per run (timestamp, tier, speedup,
+CI) alongside the human-readable `findings.md`:
+
+```
+python3 bench.py example_moving_average --ledger-file findings.jsonl
+```
+
+`regression_check.py` reads that ledger, groups records by comparison, and
+flags any case where the most recent run's tier ranks lower than the one
+before it for the same comparison — the same idea as a flaky-test
+detector, applied to performance claims instead of correctness:
+
+```
+python3 regression_check.py findings.jsonl
+```
+
 ## Design intent
 
 The three-step discipline here — verify correctness, measure past noise,

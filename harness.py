@@ -30,6 +30,7 @@ import random
 import statistics
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 
@@ -238,3 +239,32 @@ def render_finding(result: ComparisonResult, technique: str, target: str, source
         f"- source: {source}",
     ]
     return "\n".join(lines)
+
+
+def to_ledger_record(
+    result: ComparisonResult, technique: str, target: str, source: str
+) -> dict:
+    """Machine-readable form of a finding, for a running JSONL ledger.
+
+    The same technique/target pair gets re-run over time (different
+    machine, after a dependency bump, on CI vs. locally); a ledger of these
+    records is what lets a later run notice a `confirmed` result quietly
+    became `noise` on some other occasion, instead of that being buried in
+    a markdown log meant for humans. See regression_check.py.
+    """
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "technique": technique,
+        "target": target,
+        "source": source,
+        "tier": result.tier,
+        "correctness_passed": result.correctness_passed,
+        "correctness_detail": result.correctness_detail,
+        "baseline_mean_ms": result.baseline.mean * 1e3,
+        "optimized_mean_ms": result.optimized.mean * 1e3,
+        "speedup_pct": result.speedup_pct,
+        "t_stat": result.t_stat,
+        "speedup_ci_low_pct": result.speedup_ci_low,
+        "speedup_ci_high_pct": result.speedup_ci_high,
+        "n_trials": result.baseline.n,
+    }
