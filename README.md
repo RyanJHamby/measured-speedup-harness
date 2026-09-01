@@ -3,6 +3,28 @@
 A harness for verifying that a code change is actually faster, not just
 faster on one lucky run.
 
+**3 seconds of wall-clock time, same profiler, same window, two implementations of the same function:**
+
+<table>
+<tr>
+<th>Baseline — naive loop</th>
+<th>Optimized — cumsum-based</th>
+</tr>
+<tr>
+<td><img src="examples/baseline_speedscope.png" width="480"></td>
+<td><img src="examples/optimized_speedscope.png" width="480"></td>
+</tr>
+</table>
+
+Left: one continuous call to `moving_average_naive` fills the entire
+3-second window — it's still running the same invocation when the capture
+ends. Right: the same 3 seconds fits thousands of complete calls to
+`moving_average_vectorized`, each one a full round trip through numpy's
+internals (visible as the dense, colorful churn instead of one flat bar).
+That density difference *is* the speedup — not a percentage on a page, a
+visibly different number of times the same work got done in the same
+window. [Explore both profiles interactively](#profiling-what-actually-changed).
+
 ## Why this exists
 
 A single before/after timing is not evidence. Two runs of identical,
@@ -158,6 +180,8 @@ guessed at in advance:
 pip install -r requirements-dev.txt
 pytest tests/
 ```
+
+## Profiling: what actually changed
 
 The harness answers "is it faster and by how much," deliberately not
 "why" — guessing why from a timing number alone is how optimization effort
