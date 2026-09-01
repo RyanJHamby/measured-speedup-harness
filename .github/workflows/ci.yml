@@ -24,6 +24,20 @@ jobs:
       - name: Run correctness tests
         run: pytest tests/ -q
 
+      # Whether a script runs at all is a hard gate, same as the
+      # correctness tests above - this is "does the code crash," not "is
+      # the timing result trustworthy." Exercises the CLIs that aren't
+      # otherwise covered by pytest, so leaderboard.py, plot.py, and
+      # regression_check.py can't silently bit-rot unnoticed.
+      - name: Smoke-test the CLI tools
+        run: |
+          python3 bench.py example_moving_average --n-trials 10 --warmup 2 --plot ci-plot.png
+          test -f ci-plot.png
+          python3 leaderboard.py example_moving_average_variants --n-trials 10 --warmup 2
+          python3 run_suite.py example_moving_average example_matmul \
+            --n-trials 10 --warmup 2 --ledger-file /tmp/smoke-ledger.jsonl
+          python3 regression_check.py /tmp/smoke-ledger.jsonl
+
       # Timing is reported, not gated. Shared CI runners are noisy in
       # ways a laptop isn't (other tenants on the same host, throttled
       # or burstable CPU, no consistent clock speed run to run) - a tier
