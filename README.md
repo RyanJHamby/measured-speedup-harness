@@ -74,7 +74,7 @@ percentage with no basis behind it.
 - optimized: 0.0363 ms +/- 0.0054 ms (n=25), p50/p95/p99 = 0.0345/0.0458/0.0487 ms
 - speedup: 99.7% (t=165.11, df=24.0, p=3.4e-38), 95% CI [99.7%, 99.8%]
 - decision_rule: correctness gate; min_speedup_pct=5.0; t_threshold=2.0 (Welch's t, 25 interleaved trials)
-- source: example_moving_average.py, run locally, no external deps beyond numpy
+- source: scenarios/moving_average.py, run locally, no external deps beyond numpy
 ```
 
 The 95% CI comes from bootstrap resampling of the trial data, alongside
@@ -156,7 +156,7 @@ Some concrete cases it's suited for:
 ### Scaling to a batch of comparisons
 
 ```
-python3 run_suite.py example_moving_average example_matmul --ledger-file findings.jsonl
+python3 run_suite.py scenarios.moving_average scenarios.matmul --ledger-file findings.jsonl
 ```
 
 ```
@@ -165,8 +165,8 @@ Suite summary: 2 confirmed
 
 | scenario | tier | speedup | correctness | sig. after FDR correction |
 |---|---|---|---|---|
-| example_moving_average | confirmed | 99.7% | pass | yes |
-| example_matmul | confirmed | 100.0% | pass | yes |
+| scenarios.moving_average | confirmed | 99.7% | pass | yes |
+| scenarios.matmul | confirmed | 100.0% | pass | yes |
 ```
 
 A scenario that fails to import or crashes mid-run doesn't abort the
@@ -217,7 +217,7 @@ for, is when a "faster" implementation is only faster *within a domain*,
 and finding that domain's edge requires actually looking rather than
 assuming. Three more scenarios in this repo are built around exactly that:
 
-- **`example_variance.py`** — the classic single-pass "sum of squares minus
+- **`scenarios/variance.py`** — the classic single-pass "sum of squares minus
   square of sum" variance formula is a textbook catastrophic-cancellation
   trap. Property-testing it (`tests/test_variance_equivalence.py`, swept
   across 1680+ magnitude/spread/n/seed combinations, not one hand-picked
@@ -230,7 +230,7 @@ assuming. Three more scenarios in this repo are built around exactly that:
   stable alternatives are 2-3x *slower*, correctly tiered `noise` by the
   harness instead of a forced "confirmed" speedup — the honest framing
   here is "what does fixing the bug cost," not "this is also faster."
-- **`example_softmax.py`** — naive softmax (`exp(x)` then normalize) has
+- **`scenarios/softmax.py`** — naive softmax (`exp(x)` then normalize) has
   two distinct failure modes, not one, found by actually running it rather
   than trusting the textbook description
   (`tests/test_softmax_equivalence.py`): the well-known overflow-to-`nan`
@@ -242,7 +242,7 @@ assuming. Three more scenarios in this repo are built around exactly that:
   non-negativity, *and* sum≈1 specifically because a `nan`/`inf` check
   alone would have missed that second regime entirely. The fix costs
   ~15-17% in speed, measured, not assumed — another `noise`-tier result.
-- **`example_moving_average_variants.py`'s `kahan` candidate** — closes a
+- **`scenarios/moving_average_variants.py`'s `kahan` candidate** — closes a
   promissory note this repo's own docstring left open (`use compensated
   Kahan summation ... instead of one running cumsum`). Built and measured:
   Kahan summation does extend cumsum's precision domain roughly three
@@ -260,7 +260,7 @@ Run all four single-baseline scenarios as one batch, the same way you'd
 validate a real migration:
 
 ```
-python3 run_suite.py example_moving_average example_matmul example_variance example_softmax \
+python3 run_suite.py scenarios.moving_average scenarios.matmul scenarios.variance scenarios.softmax \
   --ledger-file findings.jsonl
 ```
 
@@ -270,10 +270,10 @@ Suite summary: 2 confirmed, 2 noise
 
 | scenario | tier | speedup | correctness | sig. after FDR correction |
 |---|---|---|---|---|
-| example_moving_average | confirmed | 99.7% | pass | yes |
-| example_matmul | confirmed | 100.0% | pass | yes |
-| example_variance | noise | -215.7% | pass | yes |
-| example_softmax | noise | -17.3% | pass | yes |
+| scenarios.moving_average | confirmed | 99.7% | pass | yes |
+| scenarios.matmul | confirmed | 100.0% | pass | yes |
+| scenarios.variance | noise | -215.7% | pass | yes |
+| scenarios.softmax | noise | -17.3% | pass | yes |
 ```
 
 Worth noticing: `variance` and `softmax` are `noise`-tier (they got
@@ -302,12 +302,12 @@ result = compare(
 print(render_finding(result, technique="...", target="...", source="..."))
 ```
 
-`example_moving_average.py` (memory-bound) and `example_matmul.py`
+`scenarios/moving_average.py` (memory-bound) and `scenarios/matmul.py`
 (compute-bound) are fully worked examples. Both run standalone:
 
 ```
-python3 example_moving_average.py
-python3 example_matmul.py
+python3 scenarios/moving_average.py
+python3 scenarios/matmul.py
 ```
 
 Or run either through the CLI, which works against any module exposing
@@ -315,9 +315,9 @@ Or run either through the CLI, which works against any module exposing
 and `SOURCE`:
 
 ```
-python3 bench.py example_moving_average --n-trials 50 --min-speedup 3
-python3 bench.py example_matmul
-python3 bench.py example_moving_average --plot moving_average.png
+python3 bench.py scenarios.moving_average --n-trials 50 --min-speedup 3
+python3 bench.py scenarios.matmul
+python3 bench.py scenarios.moving_average --plot moving_average.png
 ```
 
 `--plot` saves a histogram of the baseline/optimized trial distributions.
@@ -350,8 +350,8 @@ scenario's baseline or optimized path so that question gets answered by
 looking, not assuming:
 
 ```
-sudo python3 profile.py example_moving_average --which baseline --out profiles/baseline.speedscope.json
-sudo python3 profile.py example_moving_average --which optimized --out profiles/optimized.speedscope.json
+sudo python3 profile.py scenarios.moving_average --which baseline --out profiles/baseline.speedscope.json
+sudo python3 profile.py scenarios.moving_average --which optimized --out profiles/optimized.speedscope.json
 ```
 
 `py-spy` needs root on macOS to attach to a process, even one it launches
@@ -390,12 +390,12 @@ own interleaved timing run, so candidates aren't timed against each other
 directly) and `render_leaderboard` ranks them:
 
 ```
-python3 leaderboard.py example_moving_average_variants
+python3 leaderboard.py scenarios.moving_average_variants
 ```
 
 ```
 Leaderboard: moving average, N=4000, window=50
-source: example_moving_average_variants.py, run locally, no external deps beyond numpy
+source: scenarios/moving_average_variants.py, run locally, no external deps beyond numpy
 
 | candidate | tier | speedup vs. baseline | correctness | mean time |
 |---|---|---|---|---|
@@ -419,7 +419,7 @@ appends a machine-readable JSON record per run (timestamp, tier, speedup,
 CI) alongside the human-readable `findings.md`:
 
 ```
-python3 bench.py example_moving_average --ledger-file findings.jsonl
+python3 bench.py scenarios.moving_average --ledger-file findings.jsonl
 ```
 
 `regression_check.py` reads that ledger, groups records by comparison, and

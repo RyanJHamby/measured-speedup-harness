@@ -31,12 +31,12 @@ jobs:
       # regression_check.py can't silently bit-rot unnoticed.
       - name: Smoke-test the CLI tools
         run: |
-          python3 bench.py example_moving_average --n-trials 10 --warmup 2 --plot ci-plot.png
+          python3 bench.py scenarios.moving_average --n-trials 10 --warmup 2 --plot ci-plot.png
           test -f ci-plot.png
-          python3 leaderboard.py example_moving_average_variants --n-trials 10 --warmup 2
-          python3 leaderboard.py example_variance --n-trials 10 --warmup 2
-          python3 leaderboard.py example_softmax --n-trials 10 --warmup 2
-          python3 run_suite.py example_moving_average example_matmul example_variance example_softmax \
+          python3 leaderboard.py scenarios.moving_average_variants --n-trials 10 --warmup 2
+          python3 leaderboard.py scenarios.variance --n-trials 10 --warmup 2
+          python3 leaderboard.py scenarios.softmax --n-trials 10 --warmup 2
+          python3 run_suite.py scenarios.moving_average scenarios.matmul scenarios.variance scenarios.softmax \
             --n-trials 10 --warmup 2 --ledger-file /tmp/smoke-ledger.jsonl
           python3 regression_check.py /tmp/smoke-ledger.jsonl
 
@@ -52,7 +52,7 @@ jobs:
       - name: Run benchmark suite (informational, not a merge gate)
         continue-on-error: true
         run: |
-          python3 run_suite.py example_moving_average example_matmul example_variance example_softmax \
+          python3 run_suite.py scenarios.moving_average scenarios.matmul scenarios.variance scenarios.softmax \
             --n-trials 20 --warmup 5 \
             --ledger-file ci-findings.jsonl \
             --summary-file ci-summary.md

@@ -3,7 +3,7 @@ Suite summary: 2 confirmed, 2 noise
 
 | scenario | tier | speedup | correctness | sig. after FDR correction |
 |---|---|---|---|---|
-| example_moving_average | confirmed | 99.7% | pass | yes |
-| example_matmul | confirmed | 99.9% | pass | yes |
-| example_variance | noise | -209.5% | pass | yes |
-| example_softmax | noise | -16.8% | pass | yes |
+| scenarios.moving_average | confirmed | 99.7% | pass | yes |
+| scenarios.matmul | confirmed | 100.0% | pass | yes |
+| scenarios.variance | noise | -216.3% | pass | yes |
+| scenarios.softmax | noise | -16.7% | pass | yes |

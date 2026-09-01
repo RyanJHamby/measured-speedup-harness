@@ -8,8 +8,8 @@ the interleaved timing, the correctness gate, the decision rule - is the
 thing on display, not the target op. Swap `baseline` / `optimized` below
 for whatever real comparison you're running; the harness doesn't change.
 
-Run directly:      python3 example_moving_average.py
-Run via the CLI:    python3 bench.py example_moving_average
+Run directly:      python3 scenarios/moving_average.py
+Run via the CLI:    python3 bench.py scenarios.moving_average
 """
 
 import random
@@ -132,12 +132,14 @@ OPTIMIZED_FN = lambda: moving_average_vectorized(_DATA, _WINDOW)
 CHECK_EQUIVALENT = _check_equivalent
 TECHNIQUE = "Replace naive O(N*W) sliding-sum loop with O(N) cumsum-based moving average"
 TARGET = f"moving average, N={_N}, window={_WINDOW}"
-SOURCE = "example_moving_average.py, run locally, no external deps beyond numpy"
+SOURCE = "scenarios/moving_average.py, run locally, no external deps beyond numpy"
 
 
 if __name__ == "__main__":
     import sys
+    from pathlib import Path
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from bench import run_scenario
 
     result, finding = run_scenario(sys.modules[__name__], n_trials=25, warmup=3)

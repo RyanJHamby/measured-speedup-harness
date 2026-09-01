@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from example_variance import variance_naive, variance_two_pass, variance_welford
+from scenarios.variance import variance_naive, variance_two_pass, variance_welford
 
 
 def _clustered_data(mean: float, spread: float, n: int, seed: int) -> list[float]:

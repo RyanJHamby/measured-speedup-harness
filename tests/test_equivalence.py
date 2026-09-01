@@ -17,7 +17,7 @@ this test caught a real precision gap on high-dynamic-range inputs (large
 values alongside much smaller differences between them), where the
 cumsum-based implementation loses precision to catastrophic cancellation
 that the naive loop doesn't suffer from. See the docstring on
-moving_average_vectorized in example_moving_average.py.
+moving_average_vectorized in scenarios/moving_average.py.
 
 The element range below (+/-1e3) is a deliberate, documented domain limit,
 not an attempt to relax the tolerance until the test stops failing. This
@@ -46,7 +46,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
-from example_moving_average import moving_average_naive, moving_average_vectorized
+from scenarios.moving_average import moving_average_naive, moving_average_vectorized
 
 
 @given(

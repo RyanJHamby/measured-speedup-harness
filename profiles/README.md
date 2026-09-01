@@ -5,8 +5,8 @@ as concrete evidence rather than a description of what the tools produce.
 
 - `baseline.speedscope.json`, `optimized.speedscope.json` — captured with:
   ```
-  sudo python3 profile.py example_moving_average --which baseline --out profiles/baseline.speedscope.json
-  sudo python3 profile.py example_moving_average --which optimized --out profiles/optimized.speedscope.json
+  sudo python3 profile.py scenarios.moving_average --which baseline --out profiles/baseline.speedscope.json
+  sudo python3 profile.py scenarios.moving_average --which optimized --out profiles/optimized.speedscope.json
   ```
   `py-spy` requires root on macOS to attach to a process, even one it
   launches itself, so these can't be regenerated from an unattended script

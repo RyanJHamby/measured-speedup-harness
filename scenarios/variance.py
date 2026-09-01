@@ -30,9 +30,9 @@ bug costs real time here, it isn't a free lunch, and knowing the actual
 cost (not assuming it's negligible) is the point of measuring it rather
 than reasoning about it in the abstract.
 
-Run directly:      python3 example_variance.py
-Run via the CLI:    python3 bench.py example_variance
-Leaderboard (all three): python3 leaderboard.py example_variance
+Run directly:      python3 scenarios/variance.py
+Run via the CLI:    python3 bench.py scenarios.variance
+Leaderboard (all three): python3 leaderboard.py scenarios.variance
 """
 
 import random
@@ -131,18 +131,20 @@ CHECK_EQUIVALENT = _check_equivalent
 # Framed as a check, not an optimization claim: BASELINE_FN is the fast-
 # but-domain-limited naive formula; OPTIMIZED_FN is the numerically stable
 # alternative. Measured here, the stable version is actually slower (see
-# example_variance.py's module docstring) - bench.py's tiering correctly
+# scenarios/variance.py's module docstring) - bench.py's tiering correctly
 # reports that as "noise", not a false "confirmed" speedup. The point of
 # this scenario is quantifying the real cost of fixing the cancellation
 # bug, not claiming Welford's algorithm is faster.
 TECHNIQUE = "Naive single-pass variance vs. Welford's algorithm: what does fixing the cancellation bug actually cost"
 TARGET = f"variance, N={_N}, realistic magnitude (mean~100)"
-SOURCE = "example_variance.py, run locally, no external deps"
+SOURCE = "scenarios/variance.py, run locally, no external deps"
 
 
 if __name__ == "__main__":
     import sys
+    from pathlib import Path
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from bench import run_scenario
 
     result, finding = run_scenario(sys.modules[__name__], n_trials=25, warmup=3)

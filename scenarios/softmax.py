@@ -20,8 +20,8 @@ softmax_stable subtracts max(x) before exponentiating - the largest
 resulting exponent is exactly exp(0) = 1, so neither failure mode is
 reachable regardless of the input's absolute magnitude.
 
-Run directly:      python3 example_softmax.py
-Run via the CLI:    python3 leaderboard.py example_softmax
+Run directly:      python3 scenarios/softmax.py
+Run via the CLI:    python3 leaderboard.py scenarios.softmax
 """
 
 import numpy as np
@@ -88,12 +88,14 @@ CHECK_EQUIVALENT = _check_equivalent
 # "noise" in the wrong direction, not a false "confirmed" speedup.
 TECHNIQUE = "Naive softmax vs. max-subtraction-stabilized softmax: what avoiding overflow/silent-zero costs"
 TARGET = f"softmax, N={len(_X)}, values ~ N(0, 3)"
-SOURCE = "example_softmax.py, run locally, no external deps beyond numpy"
+SOURCE = "scenarios/softmax.py, run locally, no external deps beyond numpy"
 
 
 if __name__ == "__main__":
     import sys
+    from pathlib import Path
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from leaderboard import run_leaderboard
 
     print(run_leaderboard(sys.modules[__name__], n_trials=25, warmup=3))

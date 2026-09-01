@@ -11,8 +11,8 @@ A scenario module must define:
   SOURCE            str, where this comparison lives / how to rerun it
 
 Usage:
-  python bench.py example_moving_average
-  python bench.py example_matmul --n-trials 50 --min-speedup 3
+  python bench.py scenarios.moving_average
+  python bench.py scenarios.matmul --n-trials 50 --min-speedup 3
 """
 
 import argparse

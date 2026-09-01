@@ -10,7 +10,7 @@ A scenario module must define:
   SOURCE            str, where this comparison lives / how to rerun it
 
 Usage:
-  python3 leaderboard.py example_moving_average_variants
+  python3 leaderboard.py scenarios.moving_average_variants
 """
 
 import argparse

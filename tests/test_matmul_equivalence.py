@@ -8,7 +8,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
-from example_matmul import matmul_naive, matmul_vectorized
+from scenarios.matmul import matmul_naive, matmul_vectorized
 
 _elements = st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False)
 

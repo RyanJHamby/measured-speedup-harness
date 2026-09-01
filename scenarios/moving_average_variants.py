@@ -7,7 +7,7 @@ question stops being "is X faster than baseline" and becomes "which of
 these is actually the best choice, and is the fastest one even the right
 one to ship" - moving_average_vectorized is faster in raw terms but has a
 documented precision domain limit (see its docstring in
-example_moving_average.py).
+scenarios/moving_average.py).
 
 moving_average_kahan was added expecting it to be the "best of both"
 option (cumsum's speed, without cumsum's domain limit). Measuring it
@@ -26,12 +26,17 @@ a convolution-shaped alternative available - not as the right choice for
 this particular moving-average example. That's the point of measuring
 several candidates instead of picking the one that sounds best on paper.
 
-Run: python3 leaderboard.py example_moving_average_variants
+Run: python3 leaderboard.py scenarios.moving_average_variants
 """
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
 
-from example_moving_average import (
+from scenarios.moving_average import (
     _DATA,
     _WINDOW,
     _check_equivalent,
@@ -49,12 +54,10 @@ CANDIDATES = {
 }
 CHECK_EQUIVALENT = _check_equivalent
 TARGET = f"moving average, N={len(_DATA)}, window={_WINDOW}"
-SOURCE = "example_moving_average_variants.py, run locally, no external deps beyond numpy"
+SOURCE = "scenarios/moving_average_variants.py, run locally, no external deps beyond numpy"
 
 
 if __name__ == "__main__":
-    import sys
-
     from leaderboard import run_leaderboard
 
     print(run_leaderboard(sys.modules[__name__], n_trials=25, warmup=3))

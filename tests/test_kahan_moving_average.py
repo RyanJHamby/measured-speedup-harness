@@ -43,7 +43,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
-from example_moving_average import (
+from scenarios.moving_average import (
     moving_average_kahan,
     moving_average_naive,
     moving_average_vectorized,

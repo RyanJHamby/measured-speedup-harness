@@ -15,12 +15,12 @@ an SVG rendered inline on GitHub, doesn't lose its interactivity to script
 sanitization. See README.md for how these get published.
 
 Usage:
-  python3 profile.py example_moving_average --which baseline --out baseline.speedscope.json
-  python3 profile.py example_moving_average --which optimized --out optimized.speedscope.json
+  python3 profile.py scenarios.moving_average --which baseline --out baseline.speedscope.json
+  python3 profile.py scenarios.moving_average --which optimized --out optimized.speedscope.json
 
 Requires py-spy (see requirements-dev.txt). On macOS, py-spy needs to run
 as root to attach to another process, even one it launches itself:
-  sudo python3 profile.py example_moving_average
+  sudo python3 profile.py scenarios.moving_average
 """
 
 import argparse
@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Capture a profile of a scenario's baseline or optimized path."
     )
-    parser.add_argument("scenario", help="Dotted module path, e.g. example_moving_average")
+    parser.add_argument("scenario", help="Dotted module path, e.g. scenarios.moving_average")
     parser.add_argument("--which", choices=["baseline", "optimized"], default="baseline")
     parser.add_argument("--seconds", type=float, default=3.0)
     parser.add_argument(

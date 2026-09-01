@@ -63,7 +63,7 @@ def test_render_leaderboard_sorts_correctness_failures_last():
 
 
 def test_run_leaderboard_against_real_scenario():
-    module = importlib.import_module("example_moving_average_variants")
+    module = importlib.import_module("scenarios.moving_average_variants")
     result_text = run_leaderboard(module, n_trials=10, warmup=2)
     assert "cumsum" in result_text
     assert "convolve" in result_text

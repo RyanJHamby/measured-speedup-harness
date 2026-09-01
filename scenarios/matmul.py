@@ -11,8 +11,8 @@ cache-aware, BLAS-backed routine instead of scalar Python loops. Running
 both examples through the same harness is meant to show the harness
 doesn't care which kind of bottleneck it's measuring.
 
-Run directly:      python3 example_matmul.py
-Run via the CLI:    python3 bench.py example_matmul
+Run directly:      python3 scenarios/matmul.py
+Run via the CLI:    python3 bench.py scenarios.matmul
 """
 
 import random
@@ -58,12 +58,14 @@ OPTIMIZED_FN = lambda: matmul_vectorized(_A, _B)
 CHECK_EQUIVALENT = _check_equivalent
 TECHNIQUE = "Replace naive triple-loop matmul with BLAS-backed np.matmul"
 TARGET = f"matrix multiply, {_N}x{_N} @ {_N}x{_N}"
-SOURCE = "example_matmul.py, run locally, no external deps beyond numpy"
+SOURCE = "scenarios/matmul.py, run locally, no external deps beyond numpy"
 
 
 if __name__ == "__main__":
     import sys
+    from pathlib import Path
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from bench import run_scenario
 
     result, finding = run_scenario(sys.modules[__name__], n_trials=25, warmup=3)

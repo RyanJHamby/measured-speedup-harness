@@ -8,9 +8,9 @@ from run_suite import benjamini_hochberg, render_summary, run_suite
 
 def test_run_suite_runs_real_scenarios_and_tallies_tiers():
     results = run_suite(
-        ["example_moving_average", "example_matmul"], n_trials=10, warmup=2
+        ["scenarios.moving_average", "scenarios.matmul"], n_trials=10, warmup=2
     )
-    assert set(results) == {"example_moving_average", "example_matmul"}
+    assert set(results) == {"scenarios.moving_average", "scenarios.matmul"}
     for outcome in results.values():
         assert outcome[0] == "ok"
         _, result, finding = outcome
@@ -20,9 +20,9 @@ def test_run_suite_runs_real_scenarios_and_tallies_tiers():
 
 def test_run_suite_isolates_a_bad_scenario_without_aborting_the_batch():
     results = run_suite(
-        ["example_moving_average", "this_module_does_not_exist"], n_trials=10, warmup=2
+        ["scenarios.moving_average", "this_module_does_not_exist"], n_trials=10, warmup=2
     )
-    assert results["example_moving_average"][0] == "ok"
+    assert results["scenarios.moving_average"][0] == "ok"
     assert results["this_module_does_not_exist"][0] == "error"
 
 

@@ -1,7 +1,7 @@
 """
 Property-based correctness check for the softmax example, plus pinned
 regression tests for the two failure thresholds found by actually running
-this (see example_softmax.py's module docstring and function docstrings):
+this (see scenarios/softmax.py's module docstring and function docstrings):
 
   1. "Silent zero" regime: np.sum(exp(x)) overflows to inf before any
      individual exp(x) term does, for x roughly above log(float64_max / n)
@@ -31,7 +31,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
-from example_softmax import _is_valid_distribution, softmax_naive, softmax_stable
+from scenarios.softmax import _is_valid_distribution, softmax_naive, softmax_stable
 
 _safe_elements = st.floats(min_value=-50, max_value=50, allow_nan=False, allow_infinity=False)
 

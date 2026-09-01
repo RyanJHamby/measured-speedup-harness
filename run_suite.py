@@ -12,8 +12,8 @@ decision rule) across a whole batch and reports counts by tier instead of
 requiring someone to read N individual reports.
 
 Usage:
-  python3 run_suite.py example_moving_average example_matmul
-  python3 run_suite.py example_moving_average example_matmul --ledger-file findings.jsonl
+  python3 run_suite.py scenarios.moving_average scenarios.matmul
+  python3 run_suite.py scenarios.moving_average scenarios.matmul --ledger-file findings.jsonl
 """
 
 import argparse
