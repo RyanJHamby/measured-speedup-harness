@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements-dev.txt
+
+      # Correctness is a hard gate: this is the harness's own claim that
+      # the naive and vectorized implementations agree, checked with
+      # hundreds of Hypothesis-generated inputs, not just the one array
+      # each example happens to use.
+      - name: Run correctness tests
+        run: pytest tests/ -q
+
+      # Timing is reported, not gated. Shared CI runners are noisy in
+      # ways a laptop isn't (other tenants on the same host, throttled
+      # or burstable CPU, no consistent clock speed run to run) - a tier
+      # of `marginal` or even `noise` here doesn't mean the optimization
+      # stopped working, it can just mean this runner's noise floor is
+      # wide. Failing the build on that would train people to ignore
+      # failures instead of reading them. This step is informational:
+      # it runs the same suite a local dev would, uploads the result,
+      # and never fails the job on tier alone.
+      - name: Run benchmark suite (informational, not a merge gate)
+        continue-on-error: true
+        run: |
+          python3 run_suite.py example_moving_average example_matmul \
+            --n-trials 20 --warmup 5 \
+            --ledger-file ci-findings.jsonl \
+            --summary-file ci-summary.md
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}
+          path: |
+            ci-summary.md
+            ci-findings.jsonl
+          if-no-files-found: ignore

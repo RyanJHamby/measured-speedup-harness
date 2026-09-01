@@ -1,5 +1,7 @@
 # measured-speedup-harness
 
+[![CI](https://github.com/RyanJHamby/measured-speedup-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/RyanJHamby/measured-speedup-harness/actions/workflows/ci.yml)
+
 A harness for verifying that a code change is actually faster, not just
 faster on one lucky run.
 
@@ -157,6 +159,20 @@ errored, 12 regressed to noise, 185 confirmed" as one glance instead of
 200 separate reports. Pair with `--ledger-file` and `regression_check.py`
 to catch a kernel that was `confirmed` on the last migration pass quietly
 becoming `noise` on this one.
+
+**In CI:** `.github/workflows/ci.yml` runs the correctness test suite as a
+hard gate (Hypothesis-fuzzed equivalence checks, not one hand-picked
+input) and runs the benchmark suite as an *informational* step that never
+fails the build on tier alone. Shared CI runners are noisier than a laptop
+in ways that matter here — other tenants on the same host, throttled or
+burstable CPU, no consistent clock speed run to run — so a `marginal` or
+`noise` tier on CI doesn't necessarily mean an optimization broke, it can
+just mean this runner's noise floor is wider than the threshold expects.
+Gating a merge on that would train people to ignore the check; reporting
+it (uploaded as a build artifact each run) keeps it useful without being
+a source of flaky failures. Correctness gets the hard gate because it
+doesn't have this problem — two implementations either agree or they
+don't, regardless of which machine ran them.
 
 ## Using it
 
