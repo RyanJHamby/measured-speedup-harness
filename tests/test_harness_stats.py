@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from harness import TrialStats, _bootstrap_speedup_ci, _t_two_tailed_p_value, _welch_t, compare
+from harness import TrialStats, _bootstrap_speedup_ci, _percentile, _t_two_tailed_p_value, _welch_t, compare
 
 
 def test_t_two_tailed_p_value_matches_known_critical_values():
@@ -64,3 +64,72 @@ def test_compare_marks_no_real_difference_as_noise_or_marginal() -> None:
         warmup=5,
     )
     assert result.tier in ("noise", "marginal")
+
+
+def test_percentile_matches_known_values():
+    data = [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert _percentile(data, 50) == 3.0
+    assert _percentile(data, 0) == 1.0
+    assert _percentile(data, 100) == 5.0
+
+
+def test_percentile_ordering_p50_le_p95_le_p99():
+    rng = random.Random(3)
+    stats = TrialStats([rng.expovariate(1.0) for _ in range(200)])
+    assert stats.p50 <= stats.p95 <= stats.p99
+
+
+def test_compare_randomizes_which_arm_runs_first():
+    """Two different order_seed values shouldn't always produce the same
+    baseline-first/optimized-first sequence - if they did, "randomizing"
+    would be a no-op."""
+    call_order_a = []
+    call_order_b = []
+
+    def make_tracker(log, label):
+        def fn():
+            log.append(label)
+            return label
+
+        return fn
+
+    compare(
+        baseline_fn=make_tracker(call_order_a, "base"),
+        optimized_fn=make_tracker(call_order_a, "opt"),
+        check_equivalent=lambda a, b: (True, "ok"),
+        n_trials=20,
+        warmup=0,
+        order_seed=1,
+    )
+    compare(
+        baseline_fn=make_tracker(call_order_b, "base"),
+        optimized_fn=make_tracker(call_order_b, "opt"),
+        check_equivalent=lambda a, b: (True, "ok"),
+        n_trials=20,
+        warmup=0,
+        order_seed=2,
+    )
+    assert call_order_a != call_order_b
+
+
+def test_compare_order_seed_is_reproducible():
+    def make_tracker(log, label):
+        def fn():
+            log.append(label)
+            return label
+
+        return fn
+
+    orders = []
+    for _ in range(2):
+        log = []
+        compare(
+            baseline_fn=make_tracker(log, "base"),
+            optimized_fn=make_tracker(log, "opt"),
+            check_equivalent=lambda a, b: (True, "ok"),
+            n_trials=20,
+            warmup=0,
+            order_seed=42,
+        )
+        orders.append(tuple(log))
+    assert orders[0] == orders[1]

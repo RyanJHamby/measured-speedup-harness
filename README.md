@@ -45,11 +45,15 @@ to be called real:
 1. **Correctness first.** Baseline and candidate outputs are compared
    before any timing is trusted. A fast, incorrect implementation is
    rejected outright — its timing is not evaluated.
-2. **Interleaved trials, not two separate blocks.** Baseline and candidate
-   calls alternate (A, B, A, B, ...) instead of timing all of one and then
-   all of the other. If the machine slows down over the course of the run
-   — thermal throttling, memory pressure — that drift affects both arms
-   roughly equally instead of penalizing whichever one ran second.
+2. **Interleaved trials, not two separate blocks — with the order inside
+   each pair randomized.** Baseline and candidate calls alternate (A, B,
+   A, B, ...) instead of timing all of one and then all of the other, so
+   drift over the run (thermal throttling, memory pressure) affects both
+   arms roughly equally. Which one runs first within a given pair is also
+   randomized per trial, so an implementation that's always fast or slow
+   purely because of its fixed position (whatever benefits from — or
+   inherits stale cache/branch-predictor state from — running right after
+   its neighbor) can't be mistaken for a real speedup.
 3. **A decision rule fixed in advance.** A result is only marked
    `confirmed` if it clears both a minimum effect size (5% by default) and
    a statistical margin (a Welch's t-test against the variance in both
@@ -66,9 +70,9 @@ percentage with no basis behind it.
 - target: moving average, N=4000, window=50
 - confidence: confirmed
 - correctness: pass (max abs diff = 2.89e-14, rtol=1e-6)
-- baseline: 14.7356 ms +/- 0.3006 ms (n=25)
-- optimized: 0.0393 ms +/- 0.0138 ms (n=25)
-- speedup: 99.7% (t=244.17), 95% CI [99.7%, 99.8%]
+- baseline: 14.2959 ms +/- 0.4318 ms (n=25), p50/p95/p99 = 14.0937/15.2996/15.3906 ms
+- optimized: 0.0363 ms +/- 0.0054 ms (n=25), p50/p95/p99 = 0.0345/0.0458/0.0487 ms
+- speedup: 99.7% (t=165.11, df=24.0, p=3.4e-38), 95% CI [99.7%, 99.8%]
 - decision_rule: correctness gate; min_speedup_pct=5.0; t_threshold=2.0 (Welch's t, 25 interleaved trials)
 - source: example_moving_average.py, run locally, no external deps beyond numpy
 ```
@@ -79,6 +83,14 @@ real timing data is often right-skewed (most calls cluster near a floor,
 with occasional slow outliers from GC or OS scheduling), so the bootstrap
 interval is reported as a second, distribution-free view of the same
 question rather than a replacement for the t-test.
+
+The mean and stdev answer "is this faster on average" — the right
+question for most code, but the wrong one for anything latency-sensitive,
+where an occasional slow call matters more than the average call. p50/p95/p99
+are reported alongside for that case. With the trial counts used by
+default here (20-30), treat p99 as directional, not precise: estimating a
+99th-percentile tail reliably needs closer to hundreds of trials, not
+tens — with n=25, p99 is close to just the single slowest observed sample.
 
 | Tier | Meaning |
 |---|---|
@@ -371,6 +383,41 @@ it as if it has none:
   from picking thresholds after seeing the data, which would defeat the
   point. The discipline only holds if the thresholds are fixed before the
   run, which is a human commitment this tool can't enforce.
+- **Trials on a shared machine aren't fully independent.** The Welch's
+  t-test and the bootstrap both lean on trials being independent
+  observations. Interleaving with randomized order (see `compare()`)
+  removes the *systematic* position-effect bias, but it doesn't make
+  adjacent trials statistically independent — they still share thermal
+  state, cache contents, and OS scheduler decisions with their neighbors
+  in time. This is a real gap between the textbook assumption and what a
+  shared machine actually provides, not something interleaving fully
+  solves.
+- **Correctness-checking here is element-wise equality, not statistical
+  equivalence.** `np.allclose` (or similar) answers "do these two outputs
+  match within a numeric tolerance." A harder, more realistic version of
+  this problem shows up constantly in ML work: two kernels with different
+  accumulation order, or a lower-precision path, that don't match
+  element-wise but are both acceptable because a downstream accuracy
+  metric holds within tolerance. That's a genuinely different
+  correctness check (distributional/statistical, not pointwise) and this
+  repo doesn't attempt it.
+
+## Why not just use an existing benchmarking tool
+
+Reasonable question, since this isn't the first tool to measure whether
+code got faster. [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark),
+[airspeed velocity (asv)](https://asv.readthedocs.io/), and
+[Conbench](https://conbench.github.io/conbench/) (built for Apache Arrow)
+all do a version of interleaved/warmup-controlled timing with historical
+tracking, and are more mature, more widely used, and better integrated
+with CI than anything here. This repo isn't trying to replace them or
+argue it's better — it exists to make the underlying judgment explicit and
+inspectable: why interleaving beats sequential blocks, why a t-test alone
+isn't enough without a bootstrap and an FDR correction at scale, why CI
+perf checks shouldn't gate a merge the way correctness checks should. If
+you're setting up real benchmark infrastructure, use one of those tools;
+if you want to see the reasoning underneath what they do, that's what
+this is for.
 
 ## Design intent
 

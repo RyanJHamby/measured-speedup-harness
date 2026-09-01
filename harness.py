@@ -14,7 +14,9 @@ trustworthy:
      variance. This harness interleaves baseline/optimized calls (A/B/A/B...)
      rather than running all of one then all of the other, so slow drift
      (thermal, GC, background load) hits both arms equally instead of
-     biasing whichever ran second.
+     biasing whichever ran second. Which arm goes first within each pair
+     is also randomized per trial, so a systematic position effect (always
+     running the same arm first or second) can't masquerade as a speedup.
   3. An explicit, pre-committed decision rule for calling a result "real" -
      not "it looked faster," but a statistical margin plus a minimum
      effect size, decided before looking at the numbers.
@@ -34,6 +36,22 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 
 
+def _percentile(samples: list[float], p: float) -> float:
+    """Linear-interpolation percentile (numpy's default convention), p in [0, 100]."""
+    if not samples:
+        return 0.0
+    ordered = sorted(samples)
+    if len(ordered) == 1:
+        return ordered[0]
+    rank = (p / 100.0) * (len(ordered) - 1)
+    lo = math.floor(rank)
+    hi = math.ceil(rank)
+    if lo == hi:
+        return ordered[int(rank)]
+    frac = rank - lo
+    return ordered[lo] * (1 - frac) + ordered[hi] * frac
+
+
 @dataclass
 class TrialStats:
     samples: list[float]
@@ -49,6 +67,18 @@ class TrialStats:
     @property
     def n(self) -> int:
         return len(self.samples)
+
+    @property
+    def p50(self) -> float:
+        return _percentile(self.samples, 50)
+
+    @property
+    def p95(self) -> float:
+        return _percentile(self.samples, 95)
+
+    @property
+    def p99(self) -> float:
+        return _percentile(self.samples, 99)
 
 
 @dataclass
@@ -208,6 +238,7 @@ def compare(
     n_bootstrap_resamples: int = 2000,
     ci_confidence: float = 0.95,
     bootstrap_seed: int | None = None,
+    order_seed: int | None = None,
 ) -> ComparisonResult:
     """
     Run an interleaved A/B timing comparison with a correctness gate.
@@ -234,17 +265,39 @@ def compare(
         baseline_fn()
         optimized_fn()
 
+    # Within each interleaved pair, randomize which arm runs first. Always
+    # running baseline-then-optimized (or vice versa) introduces a
+    # systematic position effect - whichever call always goes first or
+    # second in a pair can consistently benefit or suffer from cache/branch
+    # predictor state left by its neighbor, independent of which
+    # implementation is actually faster. Randomizing per-trial removes that
+    # as a confound rather than just averaging over it.
+    order_rng = random.Random(order_seed) if order_seed is not None else random.Random()
     b_samples, o_samples = [], []
     for _ in range(n_trials):
-        t0 = time.perf_counter()
-        baseline_fn()
-        t1 = time.perf_counter()
-        b_samples.append(t1 - t0)
+        baseline_first = order_rng.random() < 0.5
+        if baseline_first:
+            t0 = time.perf_counter()
+            baseline_fn()
+            t1 = time.perf_counter()
+            b_time = t1 - t0
 
-        t0 = time.perf_counter()
-        optimized_fn()
-        t1 = time.perf_counter()
-        o_samples.append(t1 - t0)
+            t0 = time.perf_counter()
+            optimized_fn()
+            t1 = time.perf_counter()
+            o_time = t1 - t0
+        else:
+            t0 = time.perf_counter()
+            optimized_fn()
+            t1 = time.perf_counter()
+            o_time = t1 - t0
+
+            t0 = time.perf_counter()
+            baseline_fn()
+            t1 = time.perf_counter()
+            b_time = t1 - t0
+        b_samples.append(b_time)
+        o_samples.append(o_time)
 
     baseline_stats = TrialStats(b_samples)
     optimized_stats = TrialStats(o_samples)
@@ -309,8 +362,10 @@ def render_finding(result: ComparisonResult, technique: str, target: str, source
         f"- confidence: {result.tier}",
         f"- correctness: {'pass' if result.correctness_passed else 'FAIL'} "
         f"({result.correctness_detail})",
-        f"- baseline: {b.mean * 1e3:.4f} ms +/- {b.stdev * 1e3:.4f} ms (n={b.n})",
-        f"- optimized: {o.mean * 1e3:.4f} ms +/- {o.stdev * 1e3:.4f} ms (n={o.n})",
+        f"- baseline: {b.mean * 1e3:.4f} ms +/- {b.stdev * 1e3:.4f} ms (n={b.n}), "
+        f"p50/p95/p99 = {b.p50 * 1e3:.4f}/{b.p95 * 1e3:.4f}/{b.p99 * 1e3:.4f} ms",
+        f"- optimized: {o.mean * 1e3:.4f} ms +/- {o.stdev * 1e3:.4f} ms (n={o.n}), "
+        f"p50/p95/p99 = {o.p50 * 1e3:.4f}/{o.p95 * 1e3:.4f}/{o.p99 * 1e3:.4f} ms",
         f"- speedup: {result.speedup_pct:.1f}% (t={result.t_stat:.2f}, "
         f"df={result.df:.1f}, p={result.p_value:.4g}), "
         f"{result.ci_confidence * 100:.0f}% CI [{result.speedup_ci_low:.1f}%, "
@@ -341,7 +396,9 @@ def to_ledger_record(
         "correctness_passed": result.correctness_passed,
         "correctness_detail": result.correctness_detail,
         "baseline_mean_ms": result.baseline.mean * 1e3,
+        "baseline_p99_ms": result.baseline.p99 * 1e3,
         "optimized_mean_ms": result.optimized.mean * 1e3,
+        "optimized_p99_ms": result.optimized.p99 * 1e3,
         "speedup_pct": result.speedup_pct,
         "t_stat": result.t_stat,
         "df": result.df,

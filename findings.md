@@ -3,5 +3,5 @@ Suite summary: 2 confirmed
 
 | scenario | tier | speedup | correctness | sig. after FDR correction |
 |---|---|---|---|---|
-| example_moving_average | confirmed | 99.8% | pass | yes |
-| example_matmul | confirmed | 99.9% | pass | yes |
+| example_moving_average | confirmed | 99.7% | pass | yes |
+| example_matmul | confirmed | 100.0% | pass | yes |
