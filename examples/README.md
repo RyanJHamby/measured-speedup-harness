@@ -3,16 +3,21 @@
 Captured output from running this repo's own tooling against itself, kept
 as concrete evidence rather than a description of what the tools produce.
 
-- `baseline_flamegraph.svg` — captured with:
+- `baseline.speedscope.json`, `optimized.speedscope.json` — captured with:
   ```
-  sudo python3 profile.py example_moving_average --which baseline --seconds 2 --out baseline_flamegraph.svg
+  sudo python3 profile.py example_moving_average --which baseline --out examples/baseline.speedscope.json
+  sudo python3 profile.py example_moving_average --which optimized --out examples/optimized.speedscope.json
   ```
-  Open it in a browser (it's interactive - click to zoom, `/` to search).
-  208 samples, ~100% inside `moving_average_naive`, split between the loop
-  header and the `sum()` call on each window slice - confirms the naive
-  implementation's cost is exactly where you'd expect before optimizing it,
-  rather than assuming.
-
   `py-spy` requires root on macOS to attach to a process, even one it
-  launches itself, so this one can't be regenerated from an unattended
-  script - see the `sudo` invocation above.
+  launches itself, so these can't be regenerated from an unattended script
+  - see the `sudo` invocations above. View them at
+  [speedscope.app](https://www.speedscope.app/) (drag the file in, or use
+  the `#profileURL=` links in the main README to load them straight from
+  GitHub with full interactivity).
+
+  What they show: 99.7% of baseline samples land in `moving_average_naive`
+  itself. In the optimized profile, only 13.2% of samples are in
+  `moving_average_vectorized` - the majority is numpy's internal
+  argument-dispatch overhead for `np.insert`, not the `cumsum` arithmetic.
+  See the main README's profiling section for the full breakdown and what
+  it implies about where a further optimization would need to go.

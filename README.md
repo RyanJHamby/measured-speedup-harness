@@ -161,32 +161,41 @@ pytest tests/
 
 The harness answers "is it faster and by how much," deliberately not
 "why" — guessing why from a timing number alone is how optimization effort
-gets spent in the wrong place. `profile.py` captures a py-spy flamegraph of
-a scenario's baseline (or optimized) path so that question gets answered by
+gets spent in the wrong place. `profile.py` captures a py-spy profile of a
+scenario's baseline or optimized path so that question gets answered by
 looking, not assuming:
 
 ```
-sudo python3 profile.py example_moving_average --which baseline --out baseline.svg
+sudo python3 profile.py example_moving_average --which baseline --out examples/baseline.speedscope.json
+sudo python3 profile.py example_moving_average --which optimized --out examples/optimized.speedscope.json
 ```
 
 `py-spy` needs root on macOS to attach to a process, even one it launches
-itself.
+itself. Default output is [speedscope](https://www.speedscope.app/) format
+rather than a flamegraph SVG — GitHub strips the `<script>` an SVG
+flamegraph needs for zoom/search out of anything rendered inline, so that
+interactivity is lost the moment it's viewed on GitHub. speedscope.app can
+load a profile straight from a URL and keeps its full interactivity there:
 
-**What one of these actually shows:**
+- [Baseline profile](https://www.speedscope.app/#profileURL=https://raw.githubusercontent.com/RyanJHamby/measured-speedup-harness/main/examples/baseline.speedscope.json&title=baseline)
+- [Optimized profile](https://www.speedscope.app/#profileURL=https://raw.githubusercontent.com/RyanJHamby/measured-speedup-harness/main/examples/optimized.speedscope.json&title=optimized)
 
-![Flamegraph of the naive moving-average baseline](examples/baseline_flamegraph.png)
+**What these actually show, leaf-frame sample counts:**
 
-208 samples, ~100% inside `moving_average_naive`, and inside that frame the
-time splits almost entirely into the `sum()` call on each window slice (207
-of 208 samples) rather than the loop header around it. That's the actual
-evidence for why the cumsum rewrite helps — not an assumption that "loops
-are slow," but a profiler confirming exactly which line the cost sits on
-before touching any code.
+Baseline (n=303): 99.7% of samples land in `moving_average_naive` itself —
+confirms the naive loop's cost is exactly where you'd expect, not spread
+across surrounding overhead.
 
-[View the interactive version](https://ryanjhamby.github.io/measured-speedup-harness/examples/baseline_flamegraph.svg)
-(click to zoom into a frame, `/` to search) — GitHub strips the `<script>`
-a flamegraph SVG needs for that out of anything rendered inline, so the
-image above is the static view and this link is the real one.
+Optimized (n=310): only 13.2% of samples are in `moving_average_vectorized`
+directly. The plurality — 55.5% in `_wrapfunc`, 18.7% in `insert`, 8.7% in
+`normalize_axis_tuple` — is numpy's internal argument-dispatch machinery
+for `np.insert(data, 0, 0.0)`, not the `cumsum` arithmetic (2 samples).
+That's a genuine second-order finding the profiler surfaced and a hand-wave
+explanation ("vectorized code is faster") would have missed: at this array
+size, the remaining cost in the "fast" path is call overhead from prepending
+one element, not computation. A further optimization, if it mattered at
+this scale, would preallocate the output array and write the running sum
+into it directly instead of calling `np.insert`.
 
 ## Design intent
 
