@@ -13,8 +13,8 @@ faster on one lucky run.
 <th>Optimized — cumsum-based</th>
 </tr>
 <tr>
-<td><img src="examples/baseline_speedscope.png" width="480"></td>
-<td><img src="examples/optimized_speedscope.png" width="480"></td>
+<td><img src="profiles/baseline_speedscope.png" width="480"></td>
+<td><img src="profiles/optimized_speedscope.png" width="480"></td>
 </tr>
 </table>
 
@@ -350,8 +350,8 @@ scenario's baseline or optimized path so that question gets answered by
 looking, not assuming:
 
 ```
-sudo python3 profile.py example_moving_average --which baseline --out examples/baseline.speedscope.json
-sudo python3 profile.py example_moving_average --which optimized --out examples/optimized.speedscope.json
+sudo python3 profile.py example_moving_average --which baseline --out profiles/baseline.speedscope.json
+sudo python3 profile.py example_moving_average --which optimized --out profiles/optimized.speedscope.json
 ```
 
 `py-spy` needs root on macOS to attach to a process, even one it launches
@@ -361,8 +361,8 @@ flamegraph needs for zoom/search out of anything rendered inline, so that
 interactivity is lost the moment it's viewed on GitHub. speedscope.app can
 load a profile straight from a URL and keeps its full interactivity there:
 
-- [Baseline profile](https://www.speedscope.app/#profileURL=https://raw.githubusercontent.com/RyanJHamby/measured-speedup-harness/main/examples/baseline.speedscope.json&title=baseline)
-- [Optimized profile](https://www.speedscope.app/#profileURL=https://raw.githubusercontent.com/RyanJHamby/measured-speedup-harness/main/examples/optimized.speedscope.json&title=optimized)
+- [Baseline profile](https://www.speedscope.app/#profileURL=https://raw.githubusercontent.com/RyanJHamby/measured-speedup-harness/main/profiles/baseline.speedscope.json&title=baseline)
+- [Optimized profile](https://www.speedscope.app/#profileURL=https://raw.githubusercontent.com/RyanJHamby/measured-speedup-harness/main/profiles/optimized.speedscope.json&title=optimized)
 
 **What these actually show, leaf-frame sample counts:**
 
