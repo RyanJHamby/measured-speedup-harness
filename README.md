@@ -124,6 +124,39 @@ Some concrete cases it's suited for:
   degrades to `noise` (a dependency update, a platform change, an
   unrelated code change nearby) is caught the same way a test suite catches
   a correctness regression.
+- **Scaling this to a real ML migration** — a framework version bump, a new
+  hardware backend, or a compiler upgrade doesn't touch one kernel, it
+  touches dozens to hundreds of model subgraphs at once. The question stops
+  being "is this op faster" and becomes "how many of these are still
+  correct, how many actually got faster, and which ones need a human to
+  look at them." `run_suite.py` runs the same correctness-gate-then-measure
+  discipline across a whole batch of comparisons and reports counts by
+  tier instead of requiring someone to read N individual write-ups — see
+  below.
+
+### Scaling to a batch of comparisons
+
+```
+python3 run_suite.py example_moving_average example_matmul --ledger-file findings.jsonl
+```
+
+```
+Suite summary: 2 confirmed
+
+| scenario | tier | speedup | correctness |
+|---|---|---|---|
+| example_moving_average | confirmed | 99.7% | pass |
+| example_matmul | confirmed | 100.0% | pass |
+```
+
+A scenario that fails to import or crashes mid-run doesn't abort the
+batch — that would defeat the point of running many at once. It shows up
+as its own `error` row in the summary, same as a `fail`, `noise`, or
+`marginal` tier would, so a migration touching 200 kernels surfaces "3
+errored, 12 regressed to noise, 185 confirmed" as one glance instead of
+200 separate reports. Pair with `--ledger-file` and `regression_check.py`
+to catch a kernel that was `confirmed` on the last migration pass quietly
+becoming `noise` on this one.
 
 ## Using it
 
