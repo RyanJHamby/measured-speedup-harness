@@ -59,6 +59,8 @@ class ComparisonResult:
     correctness_detail: str
     speedup_pct: float
     t_stat: float
+    df: float
+    p_value: float
     speedup_ci_low: float
     speedup_ci_high: float
     ci_confidence: float
@@ -85,6 +87,79 @@ def _welch_t(a: TrialStats, b: TrialStats) -> float:
     if denom == 0:
         return math.inf if a.mean != b.mean else 0.0
     return (a.mean - b.mean) / denom
+
+
+def _welch_df(a: TrialStats, b: TrialStats) -> float:
+    """Welch-Satterthwaite degrees of freedom for the t-statistic above."""
+    va, vb = a.stdev ** 2, b.stdev ** 2
+    if va == 0 and vb == 0:
+        return a.n + b.n - 2
+    num = (va / a.n + vb / b.n) ** 2
+    den = (va / a.n) ** 2 / (a.n - 1) + (vb / b.n) ** 2 / (b.n - 1)
+    return num / den if den else a.n + b.n - 2
+
+
+def _incomplete_beta_cf(a: float, b: float, x: float, max_iter: int = 200, eps: float = 1e-12) -> float:
+    """Continued-fraction evaluation used by the regularized incomplete beta
+    function below (the standard Numerical Recipes `betacf` algorithm)."""
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < 1e-30:
+        d = 1e-30
+    d = 1.0 / d
+    h = d
+    for m in range(1, max_iter + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-30:
+            d = 1e-30
+        c = 1.0 + aa / c
+        if abs(c) < 1e-30:
+            c = 1e-30
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-30:
+            d = 1e-30
+        c = 1.0 + aa / c
+        if abs(c) < 1e-30:
+            c = 1e-30
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < eps:
+            break
+    return h
+
+
+def _regularized_incomplete_beta(a: float, b: float, x: float) -> float:
+    """I_x(a, b), the regularized incomplete beta function. No SciPy
+    dependency: this and _incomplete_beta_cf are the standard textbook
+    continued-fraction implementation (Numerical Recipes), used below to
+    get a real Student's t p-value instead of just comparing t to a fixed
+    threshold."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    log_beta = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+    front = math.exp(log_beta + a * math.log(x) + b * math.log(1.0 - x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _incomplete_beta_cf(a, b, x) / a
+    return 1.0 - front * _incomplete_beta_cf(b, a, 1.0 - x) / b
+
+
+def _t_two_tailed_p_value(t_stat: float, df: float) -> float:
+    """Two-tailed p-value for Student's t, via the regularized incomplete
+    beta function: p = I_{df/(df+t^2)}(df/2, 1/2)."""
+    if df <= 0 or math.isinf(t_stat):
+        return 0.0
+    t = abs(t_stat)
+    x = df / (df + t * t)
+    return _regularized_incomplete_beta(df / 2.0, 0.5, x)
 
 
 def _bootstrap_speedup_ci(
@@ -180,6 +255,8 @@ def compare(
         else 0.0
     )
     t_stat = _welch_t(baseline_stats, optimized_stats)
+    df = _welch_df(baseline_stats, optimized_stats)
+    p_value = _t_two_tailed_p_value(t_stat, df)
     ci_low, ci_high = _bootstrap_speedup_ci(
         baseline_stats,
         optimized_stats,
@@ -209,6 +286,8 @@ def compare(
         correctness_detail=detail,
         speedup_pct=speedup_pct,
         t_stat=t_stat,
+        df=df,
+        p_value=p_value,
         speedup_ci_low=ci_low,
         speedup_ci_high=ci_high,
         ci_confidence=ci_confidence,
@@ -232,7 +311,8 @@ def render_finding(result: ComparisonResult, technique: str, target: str, source
         f"({result.correctness_detail})",
         f"- baseline: {b.mean * 1e3:.4f} ms +/- {b.stdev * 1e3:.4f} ms (n={b.n})",
         f"- optimized: {o.mean * 1e3:.4f} ms +/- {o.stdev * 1e3:.4f} ms (n={o.n})",
-        f"- speedup: {result.speedup_pct:.1f}% (t={result.t_stat:.2f}), "
+        f"- speedup: {result.speedup_pct:.1f}% (t={result.t_stat:.2f}, "
+        f"df={result.df:.1f}, p={result.p_value:.4g}), "
         f"{result.ci_confidence * 100:.0f}% CI [{result.speedup_ci_low:.1f}%, "
         f"{result.speedup_ci_high:.1f}%]",
         f"- decision_rule: {result.rule_applied}",
@@ -264,6 +344,8 @@ def to_ledger_record(
         "optimized_mean_ms": result.optimized.mean * 1e3,
         "speedup_pct": result.speedup_pct,
         "t_stat": result.t_stat,
+        "df": result.df,
+        "p_value": result.p_value,
         "speedup_ci_low_pct": result.speedup_ci_low,
         "speedup_ci_high_pct": result.speedup_ci_high,
         "n_trials": result.baseline.n,

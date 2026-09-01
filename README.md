@@ -144,11 +144,12 @@ python3 run_suite.py example_moving_average example_matmul --ledger-file finding
 
 ```
 Suite summary: 2 confirmed
+2/2 significant after Benjamini-Hochberg FDR correction (alpha=0.05) across 2 comparisons
 
-| scenario | tier | speedup | correctness |
-|---|---|---|---|
-| example_moving_average | confirmed | 99.7% | pass |
-| example_matmul | confirmed | 100.0% | pass |
+| scenario | tier | speedup | correctness | sig. after FDR correction |
+|---|---|---|---|---|
+| example_moving_average | confirmed | 99.7% | pass | yes |
+| example_matmul | confirmed | 100.0% | pass | yes |
 ```
 
 A scenario that fails to import or crashes mid-run doesn't abort the
@@ -159,6 +160,22 @@ errored, 12 regressed to noise, 185 confirmed" as one glance instead of
 200 separate reports. Pair with `--ledger-file` and `regression_check.py`
 to catch a kernel that was `confirmed` on the last migration pass quietly
 becoming `noise` on this one.
+
+**Why the FDR correction matters at this scale, and not for one comparison:**
+each comparison's tier comes from its own independent significance test
+against `t_threshold`. That's fine in isolation, but run many independent
+tests at a fixed per-test significance level and some fraction come back
+"significant" by chance alone, even if nothing real changed — at
+alpha=0.05 across 100 kernels, roughly 5 are expected to be false
+discoveries, not real speedups or regressions. Benjamini-Hochberg controls
+the expected proportion of false discoveries among whatever gets flagged
+significant, at the cost of raising the effective bar as the batch grows —
+with one or two comparisons it barely changes anything, because there's no
+real multiple-comparisons problem yet to correct for. The "sig. after FDR
+correction" column is that correction; the `tier` column is unchanged and
+still reflects each comparison's own threshold. Most benchmark tooling
+doesn't do this at all — worth knowing it's missing if you're comparing
+this to something else.
 
 **In CI:** `.github/workflows/ci.yml` runs the correctness test suite as a
 hard gate (Hypothesis-fuzzed equivalence checks, not one hand-picked
@@ -319,6 +336,41 @@ detector, applied to performance claims instead of correctness:
 ```
 python3 regression_check.py findings.jsonl
 ```
+
+## Limitations
+
+Worth knowing where this stops being trustworthy, rather than presenting
+it as if it has none:
+
+- **Wall-clock time isn't throughput.** This measures single-threaded
+  latency per call. It says nothing about behavior under concurrency,
+  contention for a shared resource (a GPU, a lock, a connection pool), or
+  batch throughput — a change that helps single-call latency can hurt
+  throughput under load, and this harness can't see that.
+- **Sampling-profiler bias on very short calls.** `profile.py` samples at
+  a fixed rate (100 Hz by default); a function fast enough to complete
+  between samples is systematically under-represented, not just noisily
+  measured. The optimized-path profile in this repo (calls in the tens of
+  microseconds) is right at that edge — trust the relative shape of a
+  profile like that (where the plurality of time goes) more than exact
+  percentages on individual fast leaf frames.
+- **Warmup doesn't fully remove JIT/allocator effects.** A few warmup
+  calls handle the obvious cold-start cost, but allocator behavior,
+  branch predictor state, and (outside pure Python) JIT compilation can
+  keep shifting slowly across many more calls than a short warmup covers.
+- **This harness has no GPU story.** Timing an async accelerator call
+  without a synchronization barrier first is a common way to measure
+  dispatch latency instead of actual compute time, and get a fake
+  order-of-magnitude "speedup" as a result. Nothing here handles that
+  discipline yet — it would need to before this claimed to generalize to
+  GPU-timed workloads.
+- **The tier decision rule is a judgment call, not a law of statistics.**
+  `min_speedup_pct` and `t_threshold` are defaults chosen to be
+  reasonable, not derived from first principles — different workloads
+  legitimately warrant different thresholds, and nothing stops someone
+  from picking thresholds after seeing the data, which would defeat the
+  point. The discipline only holds if the thresholds are fixed before the
+  run, which is a human commitment this tool can't enforce.
 
 ## Design intent
 

@@ -11,7 +11,23 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from harness import TrialStats, _bootstrap_speedup_ci, _welch_t, compare
+from harness import TrialStats, _bootstrap_speedup_ci, _t_two_tailed_p_value, _welch_t, compare
+
+
+def test_t_two_tailed_p_value_matches_known_critical_values():
+    """Cross-check the from-scratch incomplete-beta-based p-value against
+    standard t-table critical values (two-tailed, alpha=0.05) - these are
+    textbook constants, not derived from this codebase."""
+    known_critical_values = [(2.086, 20), (2.042, 30), (2.000, 60), (1.960, 1000)]
+    for t_stat, df in known_critical_values:
+        p = _t_two_tailed_p_value(t_stat, df)
+        assert abs(p - 0.05) < 0.001
+
+
+def test_p_value_decreases_as_t_stat_increases():
+    p_small = _t_two_tailed_p_value(1.0, 30)
+    p_large = _t_two_tailed_p_value(5.0, 30)
+    assert p_large < p_small
 
 
 def test_bootstrap_ci_contains_true_speedup_for_synthetic_data() -> None:

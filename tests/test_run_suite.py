@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from run_suite import render_summary, run_suite
+from run_suite import benjamini_hochberg, render_summary, run_suite
 
 
 def test_run_suite_runs_real_scenarios_and_tallies_tiers():
@@ -29,8 +29,16 @@ def test_run_suite_isolates_a_bad_scenario_without_aborting_the_batch():
 def test_render_summary_counts_tiers_and_errors():
     results = {
         "a": ("error", "boom"),
-        "b": ("ok", _FakeResult(tier="confirmed", speedup_pct=42.0, correctness_passed=True), ""),
-        "c": ("ok", _FakeResult(tier="noise", speedup_pct=1.0, correctness_passed=True), ""),
+        "b": (
+            "ok",
+            _FakeResult(tier="confirmed", speedup_pct=42.0, correctness_passed=True, p_value=1e-6),
+            "",
+        ),
+        "c": (
+            "ok",
+            _FakeResult(tier="noise", speedup_pct=1.0, correctness_passed=True, p_value=0.9),
+            "",
+        ),
     }
     summary = render_summary(results)
     assert "1 error" in summary or "error" in summary
@@ -38,8 +46,23 @@ def test_render_summary_counts_tiers_and_errors():
     assert "noise" in summary
 
 
+def test_benjamini_hochberg_flags_small_p_values_and_controls_false_discoveries():
+    # 9 null (uniformly large) p-values and one genuinely tiny one - only
+    # the tiny one should survive correction at a reasonable batch size.
+    p_values = {f"null_{i}": 0.5 + i * 0.01 for i in range(9)}
+    p_values["real"] = 1e-8
+    significant = benjamini_hochberg(p_values, alpha=0.05)
+    assert significant["real"] is True
+    assert all(not significant[k] for k in p_values if k != "real")
+
+
+def test_benjamini_hochberg_empty_input():
+    assert benjamini_hochberg({}) == {}
+
+
 class _FakeResult:
-    def __init__(self, tier, speedup_pct, correctness_passed):
+    def __init__(self, tier, speedup_pct, correctness_passed, p_value=0.0):
         self.tier = tier
         self.speedup_pct = speedup_pct
         self.correctness_passed = correctness_passed
+        self.p_value = p_value
