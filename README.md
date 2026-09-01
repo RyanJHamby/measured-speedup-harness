@@ -270,6 +270,36 @@ one element, not computation. A further optimization, if it mattered at
 this scale, would preallocate the output array and write the running sum
 into it directly instead of calling `np.insert`.
 
+## Comparing several candidates at once
+
+Sometimes the question isn't "is X faster than the baseline," it's "which
+of several plausible replacements is actually the best one." `compare_many`
+runs each candidate against the same baseline independently (each gets its
+own interleaved timing run, so candidates aren't timed against each other
+directly) and `render_leaderboard` ranks them:
+
+```
+python3 leaderboard.py example_moving_average_variants
+```
+
+```
+Leaderboard: moving average, N=4000, window=50
+source: example_moving_average_variants.py, run locally, no external deps beyond numpy
+
+| candidate | tier | speedup vs. baseline | correctness | mean time |
+|---|---|---|---|---|
+| cumsum | confirmed | 99.8% | pass | 0.0380 ms |
+| convolve | confirmed | 99.6% | pass | 0.0551 ms |
+```
+
+The fastest candidate isn't automatically the right one to ship: `cumsum`
+wins on raw speed but has the documented precision domain limit from
+earlier in this README; `convolve` is a hair slower but doesn't share that
+limitation, because it never forms a large running total. A leaderboard
+makes that tradeoff visible in one table instead of it living in three
+separate write-ups nobody reads side by side. A correctness failure sorts
+to the bottom regardless of how fast the (wrong) output was produced.
+
 ## Tracking results over time
 
 A `confirmed` speedup isn't permanent — a dependency upgrade, a different

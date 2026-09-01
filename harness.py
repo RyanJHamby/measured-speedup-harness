@@ -268,3 +268,49 @@ def to_ledger_record(
         "speedup_ci_high_pct": result.speedup_ci_high,
         "n_trials": result.baseline.n,
     }
+
+
+def compare_many(
+    baseline_fn: Callable[[], object],
+    candidates: dict[str, Callable[[], object]],
+    check_equivalent: Callable[[object, object], tuple[bool, str]],
+    **compare_kwargs,
+) -> dict[str, ComparisonResult]:
+    """
+    Compare several candidate implementations against one baseline.
+
+    Useful once there's more than one plausible replacement for something
+    (a loop rewrite, a library-backed version, a different algorithm
+    entirely) and the question isn't "is X faster" but "which of these is
+    actually the best one, and is any of them worth the complexity." Each
+    candidate gets its own independent interleaved run against the
+    baseline - candidates are not timed against each other directly, so
+    the same noise-aware comparison applies uniformly regardless of run
+    order.
+    """
+    return {
+        name: compare(baseline_fn, candidate_fn, check_equivalent, **compare_kwargs)
+        for name, candidate_fn in candidates.items()
+    }
+
+
+def render_leaderboard(results: dict[str, ComparisonResult], baseline_label: str = "baseline") -> str:
+    """Render compare_many()'s results as a markdown table, ranked fastest
+    to slowest by mean time. Ties in speed don't override the correctness
+    gate: a candidate that fails correctness sorts to the bottom regardless
+    of how fast its (wrong) output was produced."""
+    rows = sorted(
+        results.items(),
+        key=lambda item: (not item[1].correctness_passed, item[1].optimized.mean),
+    )
+    lines = [
+        f"| candidate | tier | speedup vs. {baseline_label} | correctness | mean time |",
+        "|---|---|---|---|---|",
+    ]
+    for name, result in rows:
+        lines.append(
+            f"| {name} | {result.tier} | {result.speedup_pct:.1f}% | "
+            f"{'pass' if result.correctness_passed else 'FAIL'} | "
+            f"{result.optimized.mean * 1e3:.4f} ms |"
+        )
+    return "\n".join(lines)

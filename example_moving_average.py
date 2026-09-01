@@ -46,6 +46,22 @@ def moving_average_vectorized(data: np.ndarray, window: int) -> np.ndarray:
     return (cumsum[window:] - cumsum[:-window]) / window
 
 
+def moving_average_convolve(data: np.ndarray, window: int) -> np.ndarray:
+    """np.convolve-based implementation of the same sliding average.
+
+    Doesn't share the cumsum implementation's cancellation problem (no
+    large running total is ever formed), at the cost of doing O(N*window)
+    multiply-adds under the hood rather than cumsum's O(N) - convolution
+    is the more general operation and doesn't get to exploit the sliding-
+    window structure the way a running sum does. Whether that tradeoff is
+    worth it is exactly the kind of question a leaderboard across several
+    candidates answers better than eyeballing one comparison at a time -
+    see leaderboard.py.
+    """
+    kernel = np.ones(window) / window
+    return np.convolve(data, kernel, mode="valid")
+
+
 def _check_equivalent(a: np.ndarray, b: np.ndarray) -> tuple[bool, str]:
     ok = np.allclose(a, b, rtol=1e-6, atol=1e-9)
     max_diff = float(np.max(np.abs(a - b)))
